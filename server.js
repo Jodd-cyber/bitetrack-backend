@@ -8,6 +8,9 @@ const session = require("express-session");
 require("./config/passport");
 
 const app = express();
+app.get("/", (req, res) => {
+  res.send("BiteTrack API is running 🚀");
+});
 app.use(express.json());
 // ADD CORS MIDDLEWARE BEFORE OTHER MIDDLEWARE
 app.use(cors({
