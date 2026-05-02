@@ -1,32 +1,42 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
-const authRoutes = require("./routes/auth");
 const express = require("express");
-const cors = require("cors"); // ADD THIS
+const cors = require("cors");
 const passport = require("passport");
 const session = require("express-session");
+
 require("./config/passport");
 
+const authRoutes = require("./routes/auth");
+const foodlogRoutes = require("./routes/foodlogs");
+const feedbackRoutes = require("./routes/feedbackRoutes");
+
 const app = express();
-app.get("/", (req, res) => {
-  res.send("BiteTrack API is running 🚀");
-});
+
+app.set("trust proxy", 1); // ✅ MUST BE HERE (top, before routes)
+
+// Middleware
 app.use(express.json());
-// ADD CORS MIDDLEWARE BEFORE OTHER MIDDLEWARE
+
 app.use(cors({
-  origin: 'http://localhost:5173', // Your frontend URL
+  origin: "http://localhost:5173",
   credentials: true
 }));
 
-app.use("/auth", require("./routes/auth"));
-app.use(express.json());
+// Routes
+app.get("/", (req, res) => {
+  res.send("BiteTrack API is running 🚀");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "bitetrack-backend" });
+});
+
 app.use("/api/auth", authRoutes);
-// add near other requires
-const foodlogRoutes = require('./routes/foodlogs');
+app.use("/api/foodlogs", foodlogRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
-// add after app.use("/api/auth", authRoutes);
-app.use('/api/foodlogs', foodlogRoutes);
-
+// DB Connection
 async function connectDB() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
@@ -39,20 +49,9 @@ async function connectDB() {
 
 connectDB();
 
-app.get("/", (req, res) => {
-  res.send("BiteTrack backend is running. Try GET /health");
-});
-
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "bitetrack-backend" });
-});
-
+// Start server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-const feedbackRoutes = require("./routes/feedbackRoutes");
-
-app.use("/api/feedback", feedbackRoutes);
