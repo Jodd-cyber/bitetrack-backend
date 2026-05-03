@@ -8,6 +8,9 @@ const passport = require("passport");
 
 const router = express.Router();
 
+const getFrontendUrl = () =>
+  (process.env.FRONTEND_URL || "https://bitetrack-frontend.onrender.com").replace(/\/$/, "");
+
 // SIGNUP ROUTE
 router.post("/signup", async (req, res) => {
   try {
@@ -97,8 +100,8 @@ router.get(
   { expiresIn: "2h" }
 );
 
-    // redirect to frontend
-   res.redirect(`https://bitetrack-frontend.onrender.com/?token=${token}`);
+    const frontendUrl = getFrontendUrl();
+    res.redirect(`${frontendUrl}/oauth-success?token=${encodeURIComponent(token)}`);
   }
 );
 
@@ -126,7 +129,8 @@ router.get(
       { expiresIn: "2h" }
     );
 
-    res.redirect(`https://bitetrack-frontend.onrender.com/?token=${token}`);
+    const frontendUrl = getFrontendUrl();
+    res.redirect(`${frontendUrl}/oauth-success?token=${encodeURIComponent(token)}`);
   }
 );
 
