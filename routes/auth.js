@@ -98,7 +98,7 @@ router.get(
 );
 
     // redirect to frontend
-    res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+    res.redirect(`https://your-frontend-url.onrender.com/oauth-success?token=${token}`);
   }
 );
 
@@ -126,7 +126,7 @@ router.get(
       { expiresIn: "2h" }
     );
 
-    res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+    res.redirect(`https://your-frontend-url.onrender.com/oauth-success?token=${token}`);
   }
 );
 

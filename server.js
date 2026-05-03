@@ -10,6 +10,7 @@ require("./config/passport");
 const authRoutes = require("./routes/auth");
 const foodlogRoutes = require("./routes/foodlogs");
 const feedbackRoutes = require("./routes/feedbackRoutes");
+const notificationRoutes = require("./routes/notifications");
 
 const app = express();
 
@@ -19,13 +20,16 @@ app.set("trust proxy", 1); // ✅ MUST BE HERE (top, before routes)
 app.use(express.json());
 
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: [
+    "http://localhost:5173",
+    "https://your-frontend-url.onrender.com"
+  ],
   credentials: true
 }));
 
 // Routes
 app.get("/", (req, res) => {
-  res.send("BiteTrack API is running 🚀");
+  res.json({ message: "BiteTrack API is running 🚀" });
 });
 
 app.get("/health", (req, res) => {
@@ -35,6 +39,7 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/foodlogs", foodlogRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // DB Connection
 async function connectDB() {

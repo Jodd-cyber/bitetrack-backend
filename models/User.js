@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema(
     // 👇 ADD THESE
     resetPasswordToken: String,
     resetPasswordExpires: Date,
+    budgetAlertSentKey: String,
   },
   { timestamps: true }
 );
