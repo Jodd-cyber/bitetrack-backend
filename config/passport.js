@@ -4,9 +4,9 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User"); // adjust path if needed
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const backendBaseUrl = (
-  process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5000"
-).replace(/\/$/, "");
+const backendBaseUrl = process.env.NODE_ENV === "production"
+  ? "https://bitetrack-backend-yfkf.onrender.com"
+  : (process.env.BACKEND_URL || "http://localhost:5000");
 const googleCallbackUrl = `${backendBaseUrl}/api/auth/google/callback`;
 const githubCallbackUrl = `${backendBaseUrl}/api/auth/github/callback`;
 
