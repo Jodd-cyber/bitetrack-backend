@@ -20,7 +20,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: googleCallbackUrl,
+      callbackURL: "https://bitetrack-backend-yfkf.onrender.com/api/auth/google/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
       console.log("[Google Strategy] Profile received:", profile.emails ? profile.emails[0].value : "no email");
@@ -67,7 +67,7 @@ passport.use(
     {
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: githubCallbackUrl,
+      callbackURL: "https://bitetrack-backend-yfkf.onrender.com/api/auth/github/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
