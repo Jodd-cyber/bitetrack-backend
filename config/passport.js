@@ -17,11 +17,12 @@ console.log("=== END CONFIG ===");
 
 passport.use(
   new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "https://bitetrack-backend-yfkf.onrender.com/api/auth/google/callback",
-    },
+  {
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "https://bitetrack-backend-yfkf.onrender.com/api/auth/google/callback",
+    proxy: true
+  },
     async (accessToken, refreshToken, profile, done) => {
       console.log("[Google Strategy] Profile received:", profile.emails ? profile.emails[0].value : "no email");
   try {
