@@ -2,8 +2,6 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const FoodLog = require('../models/FoodLog');
-const User = require('../models/User');
-const sendEmail = require('../utils/sendEmail');
 
 
 
@@ -24,58 +22,6 @@ router.post('/', auth, async (req, res) => {
     });
 
     await newLog.save();
-
-    const monthlyBudget = Number(req.body.monthlyBudget) || 0;
-
-    if (monthlyBudget > 0) {
-      const logDate = new Date(newLog.date);
-      const monthStart = new Date(logDate.getFullYear(), logDate.getMonth(), 1);
-      const monthEnd = new Date(logDate.getFullYear(), logDate.getMonth() + 1, 1);
-
-      const monthLogs = await FoodLog.find({
-        user: req.user.id,
-        date: { $gte: monthStart, $lt: monthEnd }
-      });
-
-      const monthlySpent = monthLogs.reduce((sum, log) => {
-        const entrySpent = (log.items || []).reduce(
-          (itemSum, item) => itemSum + (Number(item.calories) || 0),
-          0
-        );
-        return sum + entrySpent;
-      }, 0);
-
-      const percentUsed = Math.round((monthlySpent / monthlyBudget) * 100);
-      const alertKey = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}_${monthlyBudget}_70`;
-
-      if (percentUsed >= 70) {
-        const user = await User.findById(req.user.id);
-
-        if (user && user.budgetAlertSentKey !== alertKey && user.email) {
-          const remaining = Math.max(monthlyBudget - monthlySpent, 0);
-
-          const sent = await sendEmail(
-            user.email,
-            'BiteTrack budget alert',
-            `
-              <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-                <h2 style="margin: 0 0 12px;">You have used 70% or more of your monthly budget</h2>
-                <p style="margin: 0 0 8px;">Current month budget: <b>₹${monthlyBudget}</b></p>
-                <p style="margin: 0 0 8px;">Spent so far: <b>₹${monthlySpent}</b></p>
-                <p style="margin: 0 0 8px;">Remaining: <b>₹${remaining}</b></p>
-                <p style="margin: 0 0 8px;">Budget used: <b>${percentUsed}%</b></p>
-                <p style="margin: 16px 0 0;">Open BiteTrack and review your Ledger before you overspend.</p>
-              </div>
-            `
-          );
-
-          if (sent) {
-            user.budgetAlertSentKey = alertKey;
-            await user.save();
-          }
-        }
-      }
-    }
 
     res.status(201).json(newLog);
 

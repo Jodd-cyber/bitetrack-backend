@@ -20,10 +20,8 @@ const sendEmail = async (to, subject, html) => {
     await transporter.sendMail(mailOptions);
 
     console.log("Email sent ✅");
-    return true;
   } catch (error) {
     console.error("Email error ❌", error);
-    return false;
   }
 };
 

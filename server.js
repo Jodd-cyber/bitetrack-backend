@@ -10,7 +10,6 @@ require("./config/passport");
 const authRoutes = require("./routes/auth");
 const foodlogRoutes = require("./routes/foodlogs");
 const feedbackRoutes = require("./routes/feedbackRoutes");
-const notificationRoutes = require("./routes/notifications");
 
 const app = express();
 
@@ -38,8 +37,8 @@ app.get("/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/foodlogs", foodlogRoutes);
+app.use("/api/user", require("./routes/user"));
 app.use("/api/feedback", feedbackRoutes);
-app.use("/api/notifications", notificationRoutes);
 
 // DB Connection
 async function connectDB() {
