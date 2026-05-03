@@ -3,6 +3,8 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User"); // adjust path if needed
 
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 passport.use(
   new GoogleStrategy(
     {
@@ -12,12 +14,22 @@ passport.use(
     },
     async (accessToken, refreshToken, profile, done) => {
   try {
-    let user = await User.findOne({ email: profile.emails[0].value });
+    const email = profile.emails && profile.emails[0] && profile.emails[0].value
+      ? profile.emails[0].value.toLowerCase()
+      : null;
+
+    if (!email) {
+      return done(new Error("Google profile did not include an email address"));
+    }
+
+    let user = await User.findOne({
+      email: { $regex: `^${escapeRegex(email)}$`, $options: "i" }
+    });
 
     if (!user) {
       user = await User.create({
-        name: profile.displayName,   // ✅ IMPORTANT
-        email: profile.emails[0].value,
+        name: profile.displayName || "Google User",
+        email,
         password: "google-auth"
       });
     }

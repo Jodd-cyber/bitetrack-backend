@@ -88,25 +88,30 @@ router.get(
 // GOOGLE CALLBACK
 router.get(
   "/google/callback",
-  passport.authenticate("google", { session: false }),
-  (req, res) => {
-    console.log("Google callback hit");
-    console.log("req.user:", req.user);
-    
-    const user = req.user;
+  (req, res, next) => {
+    passport.authenticate("google", { session: false }, (err, user) => {
+      if (err) {
+        console.error("Google OAuth callback error:", err);
+        return res.status(500).json({ message: "Google login failed" });
+      }
 
-    const token = jwt.sign(
-      {
-        userId: user._id,
-        name: user.name,
-        email: user.email
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "2h" }
-    );
+      if (!user) {
+        return res.status(401).json({ message: "Google login failed" });
+      }
 
-    const frontendUrl = getFrontendUrl();
-    res.redirect(`${frontendUrl}/oauth-success?token=${encodeURIComponent(token)}`);
+      const token = jwt.sign(
+        {
+          userId: user._id,
+          name: user.name,
+          email: user.email
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "2h" }
+      );
+
+      const frontendUrl = getFrontendUrl();
+      return res.redirect(`${frontendUrl}/oauth-success?token=${encodeURIComponent(token)}`);
+    })(req, res, next);
   }
 );
 

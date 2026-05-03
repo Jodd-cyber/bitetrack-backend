@@ -17,6 +17,7 @@ app.set("trust proxy", 1); // ✅ MUST BE HERE (top, before routes)
 
 // Middleware
 app.use(express.json());
+app.use(passport.initialize());
 
 app.use(cors({
   origin: [
