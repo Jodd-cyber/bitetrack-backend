@@ -1,4 +1,7 @@
+console.log("=== OAUTH CONFIG ===");
 console.log("CLIENT ID:", process.env.GOOGLE_CLIENT_ID);
+console.log("CLIENT SECRET:", process.env.GOOGLE_CLIENT_SECRET ? "[SET]" : "[MISSING]");
+console.log("NODE_ENV:", process.env.NODE_ENV);
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User"); // adjust path if needed
@@ -9,6 +12,8 @@ const backendBaseUrl = process.env.NODE_ENV === "production"
   : (process.env.BACKEND_URL || "http://localhost:5000");
 const googleCallbackUrl = `${backendBaseUrl}/api/auth/google/callback`;
 const githubCallbackUrl = `${backendBaseUrl}/api/auth/github/callback`;
+console.log("GOOGLE CALLBACK URL:", googleCallbackUrl);
+console.log("=== END CONFIG ===");
 
 passport.use(
   new GoogleStrategy(
@@ -18,6 +23,7 @@ passport.use(
       callbackURL: googleCallbackUrl,
     },
     async (accessToken, refreshToken, profile, done) => {
+      console.log("[Google Strategy] Profile received:", profile.emails ? profile.emails[0].value : "no email");
   try {
     const email = profile.emails && profile.emails[0] && profile.emails[0].value
       ? profile.emails[0].value.toLowerCase()
