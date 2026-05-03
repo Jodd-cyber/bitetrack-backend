@@ -98,7 +98,7 @@ router.get(
 );
 
     // redirect to frontend
-    res.redirect(`https://your-frontend-url.onrender.com/oauth-success?token=${token}`);
+   res.redirect(`https://bitetrack-frontend.onrender.com/?token=${token}`);
   }
 );
 
@@ -126,7 +126,7 @@ router.get(
       { expiresIn: "2h" }
     );
 
-    res.redirect(`https://your-frontend-url.onrender.com/oauth-success?token=${token}`);
+    res.redirect(`https://bitetrack-frontend.onrender.com/?token=${token}`);
   }
 );
 
