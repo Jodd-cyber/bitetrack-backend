@@ -4,13 +4,18 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User"); // adjust path if needed
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const backendBaseUrl = (
+  process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5000"
+).replace(/\/$/, "");
+const googleCallbackUrl = `${backendBaseUrl}/api/auth/google/callback`;
+const githubCallbackUrl = `${backendBaseUrl}/api/auth/github/callback`;
 
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/api/auth/google/callback",
+      callbackURL: googleCallbackUrl,
     },
     async (accessToken, refreshToken, profile, done) => {
   try {
@@ -56,7 +61,7 @@ passport.use(
     {
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: "/api/auth/github/callback",
+      callbackURL: githubCallbackUrl,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
