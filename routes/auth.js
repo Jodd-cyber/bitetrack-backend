@@ -12,6 +12,7 @@ const getFrontendUrl = () =>
   (process.env.FRONTEND_URL || "https://bitetrack-frontend.onrender.com").replace(/\/$/, "");
 
 // SIGNUP ROUTE
+// SIGNUP ROUTE
 router.post("/signup", async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -84,21 +85,25 @@ router.get(
 );
 
 // GOOGLE CALLBACK
+// GOOGLE CALLBACK
 router.get(
   "/google/callback",
   passport.authenticate("google", { session: false }),
   (req, res) => {
+    console.log("Google callback hit");
+    console.log("req.user:", req.user);
+    
     const user = req.user;
 
     const token = jwt.sign(
-  {
-    userId: user._id,
-    name: user.name,        // ✅ ADD THIS
-    email: user.email
-  },
-  process.env.JWT_SECRET,
-  { expiresIn: "2h" }
-);
+      {
+        userId: user._id,
+        name: user.name,
+        email: user.email
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "2h" }
+    );
 
     const frontendUrl = getFrontendUrl();
     res.redirect(`${frontendUrl}/oauth-success?token=${encodeURIComponent(token)}`);
@@ -117,6 +122,9 @@ router.get(
   "/github/callback",
   passport.authenticate("github", { session: false }),
   (req, res) => {
+    console.log("GitHub callback hit");
+    console.log("req.user:", req.user);
+
     const user = req.user;
 
     const token = jwt.sign(
