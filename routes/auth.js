@@ -170,7 +170,7 @@ router.get(
   "/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect: "/login",
+    failureRedirect: "http://localhost:5173/signin"
   }),
   async (req, res) => {
     try {
