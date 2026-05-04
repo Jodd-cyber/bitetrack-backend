@@ -190,7 +190,7 @@ router.get(
       );
 
       // Redirect to frontend with token
-      const frontendURL = process.env.FRONTEND_URL || "http://localhost:5173";
+      const frontendURL = "http://localhost:5173";
 
       res.redirect(`${frontendURL}/oauth-success?token=${token}`);
     } catch (err) {
