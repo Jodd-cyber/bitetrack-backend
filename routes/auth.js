@@ -5,11 +5,7 @@ const jwt = require('jsonwebtoken');
 const passport = require("passport");
 
 
-
 const router = express.Router();
-
-const getFrontendUrl = () =>
-  (process.env.FRONTEND_URL || "https://bitetrack-frontend.onrender.com").replace(/\/$/, "");
 
 // SIGNUP ROUTE
 // SIGNUP ROUTE
@@ -76,76 +72,6 @@ router.post("/login", async (req, res) => {
 });
 
 
-
-
-// GOOGLE LOGIN
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
-
-// GOOGLE CALLBACK
-// GOOGLE CALLBACK
-router.get(
-  "/google/callback",
-  (req, res, next) => {
-    passport.authenticate("google", { session: false }, (err, user) => {
-      if (err) {
-        console.error("Google OAuth callback error:", err);
-        return res.status(500).json({ message: "Google login failed" });
-      }
-
-      if (!user) {
-        return res.status(401).json({ message: "Google login failed" });
-      }
-
-      const token = jwt.sign(
-        {
-          userId: user._id,
-          name: user.name,
-          email: user.email
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: "2h" }
-      );
-
-      const frontendUrl = getFrontendUrl();
-      return res.redirect(`${frontendUrl}/oauth-success?token=${encodeURIComponent(token)}`);
-    })(req, res, next);
-  }
-);
-
-
-// GITHUB LOGIN
-router.get(
-  "/github",
-  passport.authenticate("github", { scope: ["user:email"] })
-);
-
-// GITHUB CALLBACK
-router.get(
-  "/github/callback",
-  passport.authenticate("github", { session: false }),
-  (req, res) => {
-    console.log("GitHub callback hit");
-    console.log("req.user:", req.user);
-
-    const user = req.user;
-
-    const token = jwt.sign(
-      {
-        userId: user._id,
-        name: user.name,
-        email: user.email
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "2h" }
-    );
-
-    const frontendUrl = getFrontendUrl();
-    res.redirect(`${frontendUrl}/oauth-success?token=${encodeURIComponent(token)}`);
-  }
-);
 
 
 const crypto = require("crypto");
@@ -230,6 +156,49 @@ router.post("/reset-password/:token", async (req, res) => {
     message: "Password updated successfully",
   });
 });
+
+
+router.get(
+  "/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    session: false,
+  })
+);
+
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: "/login",
+  }),
+  async (req, res) => {
+    try {
+      
+
+      const user = req.user;
+
+      // Generate JWT (same as your login)
+      const token = jwt.sign(
+        {
+          userId: user._id,
+          name: user.name,
+          email: user.email,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "2h" }
+      );
+
+      // Redirect to frontend with token
+      const frontendURL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+      res.redirect(`${frontendURL}/oauth-success?token=${token}`);
+    } catch (err) {
+      console.error(err);
+      res.redirect("/login");
+    }
+  }
+);
 
 module.exports = router;
 
