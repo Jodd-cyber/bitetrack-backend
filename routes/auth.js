@@ -200,6 +200,49 @@ router.get(
   }
 );
 
+
+router.get(
+  "/github",
+  passport.authenticate("github", {
+    scope: ["user:email"],
+    session: false,
+  })
+);
+
+
+
+router.get(
+  "/github/callback",
+  passport.authenticate("github", {
+    session: false,
+    failureRedirect: "http://localhost:5173/signin",
+  }),
+  async (req, res) => {
+    try {
+      const user = req.user;
+
+      const token = jwt.sign(
+        {
+          userId: user._id,
+          name: user.name,
+          email: user.email,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "2h" }
+      );
+
+      // 🔥 redirect to frontend (same as Google)
+      res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+    } catch (err) {
+      console.error(err);
+      res.redirect("http://localhost:5173/signin");
+    }
+  }
+);
+
+
+
+
 module.exports = router;
 
 

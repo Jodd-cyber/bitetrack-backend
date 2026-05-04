@@ -36,4 +36,46 @@ passport.use(
   )
 );
 
+
+const GitHubStrategy = require("passport-github2").Strategy;
+
+passport.use(
+  new GitHubStrategy(
+    {
+      clientID: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      callbackURL: "/api/auth/github/callback",
+      scope: ["user:email"], // 🔥 important to get email
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        // 🔥 GitHub may not return email directly
+        let email = profile.emails?.[0]?.value;
+
+        // fallback if email missing
+        if (!email) {
+          email = `${profile.username}@github.com`;
+        }
+
+        const name = profile.displayName || profile.username;
+
+        let user = await User.findOne({ email });
+
+        if (!user) {
+          user = await User.create({
+            name,
+            email,
+            password: null,
+            provider: "github",
+          });
+        }
+
+        return done(null, user);
+      } catch (err) {
+        return done(err, null);
+      }
+    }
+  )
+);
+
 module.exports = passport;
