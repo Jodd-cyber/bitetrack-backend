@@ -3,7 +3,6 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const jwt = require('jsonwebtoken');
 const passport = require("passport");
-const sendEmail = require("../utils/sendEmail");
 
 
 const router = express.Router();
@@ -13,13 +12,29 @@ const router = express.Router();
 router.post("/signup", async (req, res) => {
   try {
     const { name, email, password } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: "name, email, password are required" });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
+      // If this account was created via OAuth (no local password), allow setting one.
+      if (!existingUser.password) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        existingUser.password = hashedPassword;
+        if (name && !existingUser.name) {
+          existingUser.name = name;
+        }
+        await existingUser.save();
+
+        return res.status(200).json({
+          message: "Password set successfully. You can now sign in with email and password.",
+          user: { id: existingUser._id, name: existingUser.name, email: existingUser.email },
+        });
+      }
+
       return res.status(409).json({ message: "User already exists" });
     }
 
@@ -27,7 +42,7 @@ router.post("/signup", async (req, res) => {
 
     const user = await User.create({
       name,
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       password: hashedPassword,
     });
 
@@ -45,15 +60,22 @@ router.post("/signup", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       console.log(`Login attempt for non-existent email: ${email}`);
       return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({
+        message: "This account currently uses social login only. Set a password from Sign Up with the same email or use Forgot Password.",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -97,8 +119,9 @@ router.post("/forgot-password", async (req, res) => {
 
   try {
     const { email } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.json({ message: "If email exists, reset link sent" });
     }

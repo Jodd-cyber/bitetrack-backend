@@ -10,8 +10,12 @@ const mongoose = require('mongoose');
 // Create a food log (protected)
 router.post('/', auth, async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.user.id)) {
+      return res.status(401).json({ message: 'Invalid user token' });
+    }
+
     const newLog = new FoodLog({
-      user: mongoose.Types.ObjectId(req.user.id),
+      user: req.user.id,
       items: req.body.items || [],
       notes: req.body.notes || '',
       restaurant: req.body.restaurant || '',
@@ -35,8 +39,11 @@ router.post('/', auth, async (req, res) => {
 // Get current user's logs (protected)
 router.get('/', auth, async (req, res) => {
   try {
-    const userId = mongoose.Types.ObjectId(req.user.id);
-    const logs = await FoodLog.find({ user: userId })
+    if (!mongoose.isValidObjectId(req.user.id)) {
+      return res.json([]);
+    }
+
+    const logs = await FoodLog.find({ user: req.user.id })
       .sort({ createdAt: -1 });
 
     // ✅ FIX: ensure rating is always number
@@ -55,10 +62,13 @@ router.get('/', auth, async (req, res) => {
 
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const userId = mongoose.Types.ObjectId(req.user.id);
+    if (!mongoose.isValidObjectId(req.user.id)) {
+      return res.status(401).json({ message: 'Invalid user token' });
+    }
+
     const log = await FoodLog.findOneAndDelete({
       _id: req.params.id,
-      user: userId
+      user: req.user.id
     });
 
     if (!log) {
@@ -75,14 +85,17 @@ router.delete('/:id', auth, async (req, res) => {
 
 router.put('/:id', auth, async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.user.id)) {
+      return res.status(401).json({ message: 'Invalid user token' });
+    }
+
     const log = await FoodLog.findById(req.params.id);
 
     if (!log) {
       return res.status(404).json({ message: "Log not found" });
     }
 
-    const userId = mongoose.Types.ObjectId(req.user.id);
-    if (log.user.toString() !== userId.toString()) {
+    if (log.user.toString() !== req.user.id.toString()) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
