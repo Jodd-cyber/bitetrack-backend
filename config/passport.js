@@ -3,36 +3,52 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User");
 
 passport.use(
+  
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: "/api/auth/google/callback",
     },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        // Extract user info
-        const email = profile.emails[0].value;
-        const name = profile.displayName;
+   async (accessToken, refreshToken, profile, done) => {
+  try {
+    const rawEmail = profile.emails?.[0]?.value;
 
-        // Check if user exists
-        let user = await User.findOne({ email });
+    // 🔥 LOG HERE (IMPORTANT)
+    console.log("GOOGLE EMAIL:", rawEmail);
 
-        if (!user) {
-          // Create new user
-          user = await User.create({
-            name,
-            email,
-            password: null, 
-            provider: "google" // since OAuth user
-          });
-        }
-
-        return done(null, user);
-      } catch (err) {
-        return done(err, null);
-      }
+    if (!rawEmail) {
+      return done(new Error("No email from Google"), null);
     }
+
+    const email = rawEmail.toLowerCase().trim();
+    const name = (profile.displayName || "").trim();
+
+    let user = await User.findOne({ email });
+
+    if (user) {
+      if (!user.provider) {
+        user.provider = "google";
+        await user.save();
+      }
+
+      return done(null, user);
+    }
+
+    // create new user
+    user = await User.create({
+      name,
+      email,
+      password: null,
+      provider: "google",
+    });
+
+    return done(null, user);
+
+  } catch (err) {
+    return done(err, null);
+  }
+}
   )
 );
 
@@ -50,14 +66,17 @@ passport.use(
     async (accessToken, refreshToken, profile, done) => {
       try {
         // 🔥 GitHub may not return email directly
-        let email = profile.emails?.[0]?.value;
+        let rawEmail = profile.emails?.[0]?.value;
 
         // fallback if email missing
-        if (!email) {
-          email = `${profile.username}@github.com`;
+        if (!rawEmail) {
+          if (!rawEmail) {
+  return done(new Error("GitHub email not available"), null);
+}
         }
 
-        const name = profile.displayName || profile.username;
+        const email = rawEmail.toLowerCase().trim();
+        const name = (profile.displayName || profile.username).trim();
 
         let user = await User.findOne({ email });
 

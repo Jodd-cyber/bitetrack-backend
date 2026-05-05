@@ -40,7 +40,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/foodlogs", foodlogRoutes);
 app.use("/api/user", require("./routes/user"));
 app.use("/api/feedback", feedbackRoutes);
-
+const budgetRoutes = require("./routes/budget");
+app.use("/api/budget", budgetRoutes);
 // DB Connection
 async function connectDB() {
   try {

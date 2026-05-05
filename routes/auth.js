@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const jwt = require('jsonwebtoken');
 const passport = require("passport");
+const sendEmail = require("../utils/sendEmail");
 
 
 const router = express.Router();
@@ -42,33 +43,48 @@ router.post("/signup", async (req, res) => {
 
 // LOGIN ROUTE
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email: email.toLowerCase() });
-  if (!user) {
-    return res.status(400).json({ message: "Invalid email or password" });
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      console.log(`Login attempt for non-existent email: ${email}`);
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      console.log(`Login failed: incorrect password for ${email}`);
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        name: user.name,
+        email: user.email
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+
+    res.json({
+      message: "Login successful!",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      },
+      token
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ message: "Server error" });
   }
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    return res.status(400).json({ message: "Invalid email or password" });
-  }
-  const token = jwt.sign(
-  {
-    userId: user._id,
-    name: user.name,       // ✅ ADD THIS
-    email: user.email      // (optional)
-  },// payload, you can add more properties if needed later
-  process.env.JWT_SECRET,
-  { expiresIn: '2h' } // token is valid for 2 hours
-);
-  res.json({
-  message: "Login successful!",
-  user: {
-    id: user._id,
-    name: user.name,
-    email: user.email
-  },
-  token
-});
 });
 
 
@@ -77,50 +93,64 @@ router.post("/login", async (req, res) => {
 const crypto = require("crypto");
 
 router.post("/forgot-password", async (req, res) => {
-  const { email } = req.body;
+  console.log("🔥 route hit");
 
-  // 1. Find user
-  const user = await User.findOne({ email });
-  if (!user) {
-    return res.json({ message: "If email exists, reset link sent" });
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.json({ message: "If email exists, reset link sent" });
+    }
+
+    const crypto = require("crypto");
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 15 * 60 * 1000;
+    await user.save();
+
+    const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
+
+    const sendEmail = require("../utils/sendEmail");
+
+    try {
+      console.log("📧 About to send email...");
+
+      await sendEmail(
+        email,
+        "Reset your BiteTrack password",
+        `
+          <h2>Password Reset</h2>
+          <a href="${resetLink}">Reset Password</a>
+        `
+      );
+
+      console.log("✅ Email sent");
+
+      return res.json({
+        success: true,
+        message: "Reset link sent to your email",
+      });
+
+    } catch (err) {
+      console.error("❌ Email failed:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send email",
+      });
+    }
+
+  } catch (err) {
+    console.error("ERROR:", err);
+
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
-
-  // 2. Generate token
-  const resetToken = crypto.randomBytes(32).toString("hex");
-
-  // 3. Save token + expiry in DB
-  user.resetPasswordToken = resetToken;
-  user.resetPasswordExpires = Date.now() + 15 * 60 * 1000; // 15 min
-  await user.save();
-
-  // 4. TEMP: print link instead of email
-  const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
-
-  const sendEmail = require("../utils/sendEmail");
-
-await sendEmail(
-  email, // send to user
-  "Reset your BiteTrack password",
-  `
-    <h2>Password Reset</h2>
-    <p>You requested to reset your password.</p>
-    <p>Click the link below:</p>
-    
-    <a href="${resetLink}" style="color: blue;">
-      Reset Password
-    </a>
-
-    <p>If you didn’t request this, ignore this email.</p>
-    <p>This link expires in 15 minutes.</p>
-  `
-);
-
-  res.json({
-    success: true,
-    message: "Reset link generated (check backend console)",
-  });
 });
-
+  
 
 
 
