@@ -133,7 +133,7 @@ router.post("/forgot-password", async (req, res) => {
     user.resetPasswordExpires = Date.now() + 15 * 60 * 1000;
     await user.save();
 
-    const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
+    const resetLink = `https://bitetrack-frontendd.vercel.app/reset-password/${resetToken}`;
 
     const sendEmail = require("../utils/sendEmail");
 
@@ -223,7 +223,7 @@ router.get(
   "/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect: "http://localhost:5173/signin"
+    failureRedirect: "https://bitetrack-frontendd.vercel.app/signin"
   }),
   async (req, res) => {
     try {
@@ -243,7 +243,7 @@ router.get(
       );
 
       // Redirect to frontend with token
-      const frontendURL = "http://localhost:5173";
+      const frontendURL = "https://bitetrack-frontendd.vercel.app";
 
       res.redirect(`${frontendURL}/oauth-success?token=${token}`);
     } catch (err) {
@@ -268,7 +268,7 @@ router.get(
   "/github/callback",
   passport.authenticate("github", {
     session: false,
-    failureRedirect: "http://localhost:5173/signin",
+    failureRedirect: "https://bitetrack-frontendd.vercel.app/signin",
   }),
   async (req, res) => {
     try {
@@ -285,10 +285,10 @@ router.get(
       );
 
       // 🔥 redirect to frontend (same as Google)
-      res.redirect(`http://localhost:5173/oauth-success?token=${token}`);
+      res.redirect(`https://bitetrack-frontendd.vercel.app/oauth-success?token=${token}`);
     } catch (err) {
       console.error(err);
-      res.redirect("http://localhost:5173/signin");
+      res.redirect("https://bitetrack-frontendd.vercel.app/signin");
     }
   }
 );

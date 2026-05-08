@@ -17,6 +17,7 @@ app.use(express.json());
 
 app.use(cors({
   origin: [
+    "https://bitetrack-frontendd.vercel.app",
     "http://localhost:5173",
     "https://bitetrack-frontend.onrender.com",
     process.env.FRONTEND_URL
