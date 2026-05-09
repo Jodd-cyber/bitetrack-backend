@@ -4,6 +4,8 @@ const User = require("../models/User");
 const jwt = require('jsonwebtoken');
 const passport = require("passport");
 
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
 
 const router = express.Router();
 
@@ -133,7 +135,7 @@ router.post("/forgot-password", async (req, res) => {
     user.resetPasswordExpires = Date.now() + 15 * 60 * 1000;
     await user.save();
 
-    const resetLink = `https://bitetrack-frontendd.vercel.app/reset-password/${resetToken}`;
+    const resetLink = `${FRONTEND_URL}/reset-password/${resetToken}`;
 
     const sendEmail = require("../utils/sendEmail");
 
@@ -223,7 +225,7 @@ router.get(
   "/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect: "https://bitetrack-frontendd.vercel.app/signin"
+    failureRedirect: `${FRONTEND_URL}/signin`
   }),
   async (req, res) => {
     try {
@@ -243,12 +245,10 @@ router.get(
       );
 
       // Redirect to frontend with token
-      const frontendURL = "https://bitetrack-frontendd.vercel.app";
-
-      res.redirect(`${frontendURL}/oauth-success?token=${token}`);
+      res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
     } catch (err) {
       console.error(err);
-      res.redirect("/login");
+      res.redirect(`${FRONTEND_URL}/signin`);
     }
   }
 );
@@ -268,7 +268,7 @@ router.get(
   "/github/callback",
   passport.authenticate("github", {
     session: false,
-    failureRedirect: "https://bitetrack-frontendd.vercel.app/signin",
+    failureRedirect: `${FRONTEND_URL}/signin`,
   }),
   async (req, res) => {
     try {
@@ -285,10 +285,10 @@ router.get(
       );
 
       // 🔥 redirect to frontend (same as Google)
-      res.redirect(`https://bitetrack-frontendd.vercel.app/oauth-success?token=${token}`);
+      res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
     } catch (err) {
       console.error(err);
-      res.redirect("https://bitetrack-frontendd.vercel.app/signin");
+      res.redirect(`${FRONTEND_URL}/signin`);
     }
   }
 );
