@@ -223,17 +223,30 @@ router.get(
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", {
-    session: false,
-    failureRedirect: `${FRONTEND_URL}/signin`
-  }),
+  (req, res, next) => {
+    passport.authenticate("google", {
+      session: false,
+      failureRedirect: `${FRONTEND_URL}/signin?error=auth_failed`
+    }, (err, user, info) => {
+      if (err) {
+        console.error("Google OAuth Error:", err);
+        return res.redirect(`${FRONTEND_URL}/signin?error=server_error`);
+      }
+      
+      if (!user) {
+        console.error("No user returned from Google");
+        return res.redirect(`${FRONTEND_URL}/signin?error=no_user`);
+      }
+      
+      req.user = user;
+      next();
+    })(req, res, next);
+  },
   async (req, res) => {
     try {
-      
-
       const user = req.user;
 
-      // Generate JWT (same as your login)
+      // Generate JWT
       const token = jwt.sign(
         {
           userId: user._id,
@@ -247,8 +260,8 @@ router.get(
       // Redirect to frontend with token
       res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
     } catch (err) {
-      console.error(err);
-      res.redirect(`${FRONTEND_URL}/signin`);
+      console.error("Token Generation Error:", err);
+      res.redirect(`${FRONTEND_URL}/signin?error=token_failed`);
     }
   }
 );
@@ -266,10 +279,25 @@ router.get(
 
 router.get(
   "/github/callback",
-  passport.authenticate("github", {
-    session: false,
-    failureRedirect: `${FRONTEND_URL}/signin`,
-  }),
+  (req, res, next) => {
+    passport.authenticate("github", {
+      session: false,
+      failureRedirect: `${FRONTEND_URL}/signin?error=auth_failed`,
+    }, (err, user, info) => {
+      if (err) {
+        console.error("GitHub OAuth Error:", err);
+        return res.redirect(`${FRONTEND_URL}/signin?error=server_error`);
+      }
+      
+      if (!user) {
+        console.error("No user returned from GitHub");
+        return res.redirect(`${FRONTEND_URL}/signin?error=no_user`);
+      }
+      
+      req.user = user;
+      next();
+    })(req, res, next);
+  },
   async (req, res) => {
     try {
       const user = req.user;
@@ -284,11 +312,10 @@ router.get(
         { expiresIn: "2h" }
       );
 
-      // 🔥 redirect to frontend (same as Google)
       res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
     } catch (err) {
-      console.error(err);
-      res.redirect(`${FRONTEND_URL}/signin`);
+      console.error("Token Generation Error:", err);
+      res.redirect(`${FRONTEND_URL}/signin?error=token_failed`);
     }
   }
 );

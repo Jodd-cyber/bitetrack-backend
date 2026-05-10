@@ -1,6 +1,7 @@
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User");
+
 console.log("GOOGLE CLIENT:", process.env.GOOGLE_CLIENT_ID);
 console.log("GOOGLE SECRET:", process.env.GOOGLE_CLIENT_SECRET);
 
@@ -9,8 +10,8 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: 
-  "https://bitetrack-backend-yfkf.onrender.com/api/auth/google/callback",
+      callbackURL: "https://bitetrack-backend-yfkf.onrender.com/api/auth/google/callback",
+      proxy: true, // 🔥 ADD THIS LINE
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -36,12 +37,12 @@ passport.use(
 
         return done(null, user);
       } catch (err) {
+        console.error("Google Strategy Error:", err); // 🔥 ADD ERROR LOGGING
         return done(err, null);
       }
     }
   )
 );
-
 
 const GitHubStrategy = require("passport-github2").Strategy;
 
@@ -50,15 +51,14 @@ passport.use(
     {
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: "/api/auth/github/callback",
-      scope: ["user:email"], // 🔥 important to get email
+      callbackURL: "https://bitetrack-backend-yfkf.onrender.com/api/auth/github/callback",
+      scope: ["user:email"],
+      proxy: true, // 🔥 ADD THIS LINE TOO
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        // 🔥 GitHub may not return email directly
         let rawEmail = profile.emails?.[0]?.value;
 
-        // fallback if email missing
         if (!rawEmail) {
           return done(new Error("GitHub email not available"), null);
         }
@@ -79,6 +79,7 @@ passport.use(
 
         return done(null, user);
       } catch (err) {
+        console.error("GitHub Strategy Error:", err); // 🔥 ADD ERROR LOGGING
         return done(err, null);
       }
     }
