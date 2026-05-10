@@ -258,10 +258,22 @@ router.get(
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", {
-    session: false,
-    failureRedirect: `${FRONTEND_URL}/signin?error=google_auth_failed`,
-  }),
+  (req, res, next) => {
+    passport.authenticate("google", { session: false }, (err, user, info) => {
+      if (err) {
+        console.error("❌ Google OAuth error:", err);
+        return redirectToSignin(res, "google_auth_failed");
+      }
+
+      if (!user) {
+        console.error("❌ Google OAuth returned no user:", info);
+        return redirectToSignin(res, "google_no_user");
+      }
+
+      req.user = user;
+      return next();
+    })(req, res, next);
+  },
   (req, res) => completeOAuthLogin(req, res, "Google")
 );
 
@@ -277,10 +289,22 @@ router.get(
 
 router.get(
   "/github/callback",
-  passport.authenticate("github", {
-    session: false,
-    failureRedirect: `${FRONTEND_URL}/signin?error=github_auth_failed`,
-  }),
+  (req, res, next) => {
+    passport.authenticate("github", { session: false }, (err, user, info) => {
+      if (err) {
+        console.error("❌ GitHub OAuth error:", err);
+        return redirectToSignin(res, "github_auth_failed");
+      }
+
+      if (!user) {
+        console.error("❌ GitHub OAuth returned no user:", info);
+        return redirectToSignin(res, "github_no_user");
+      }
+
+      req.user = user;
+      return next();
+    })(req, res, next);
+  },
   (req, res) => completeOAuthLogin(req, res, "GitHub")
 );
 
