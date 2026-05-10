@@ -224,14 +224,20 @@ router.get(
 router.get(
   "/google/callback",
   (req, res, next) => {
+    console.log("🔴 Google callback received");
+    
     passport.authenticate("google", { session: false }, (err, user, info) => {
       if (err) {
-        console.error("Google OAuth Error:", err);
-        return res.redirect(`${FRONTEND_URL}/signin?error=server_error`);
+        console.error("❌ Google OAuth Error:", err.message);
+        // ✅ Redirect to FRONTEND with error
+        return res.redirect(`${FRONTEND_URL}/signin?error=oauth_failed`);
       }
       if (!user) {
+        console.error("❌ No user from Google");
+        // ✅ Redirect to FRONTEND with error
         return res.redirect(`${FRONTEND_URL}/signin?error=no_user`);
       }
+      console.log("✅ User authenticated:", user.email);
       req.user = user;
       next();
     })(req, res, next);
@@ -243,14 +249,17 @@ router.get(
         process.env.JWT_SECRET,
         { expiresIn: "2h" }
       );
+      
+      // ✅ IMPORTANT: Redirect to FRONTEND (not backend)
+      console.log("✅ Redirecting to frontend with token");
       return res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
     } catch (err) {
-      console.error("Token Generation Error:", err);
+      console.error("❌ Token Generation Error:", err);
+      // ✅ Redirect to FRONTEND with error
       return res.redirect(`${FRONTEND_URL}/signin?error=token_failed`);
     }
   }
 );
-
 
 router.get(
   "/github",
