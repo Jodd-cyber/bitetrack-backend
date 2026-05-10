@@ -220,12 +220,15 @@ const redirectToSignin = (res, error) => {
 const completeOAuthLogin = async (req, res, providerName) => {
   try {
     const user = req.user;
-
+    console.log(`✅ ${providerName}: User received`); // ✅ ADD THIS
+    
     if (!user) {
       console.error(`❌ ${providerName} OAuth completed without a user`);
       return redirectToSignin(res, `${providerName.toLowerCase()}_no_user`);
     }
 
+    console.log(`✅ ${providerName}: User fields - id:${!!user._id}, name:${!!user.name}, email:${!!user.email}`); // ✅ ADD THIS
+    
     if (!user._id || !user.name || !user.email) {
       console.error(`❌ ${providerName} OAuth user is missing required fields`, user);
       return redirectToSignin(res, `${providerName.toLowerCase()}_invalid_user`);
@@ -241,13 +244,17 @@ const completeOAuthLogin = async (req, res, providerName) => {
       { expiresIn: "2h" }
     );
 
-    return res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
+    console.log(`✅ ${providerName}: JWT generated`); // ✅ ADD THIS
+    const redirectUrl = `${FRONTEND_URL}/oauth-success?token=${token}`;
+    console.log(`📍 ${providerName}: Redirecting to: ${redirectUrl}`); // ✅ ADD THIS
+    console.log(`🎯 FRONTEND_URL used: ${FRONTEND_URL}`); // ✅ ADD THIS
+
+    return res.redirect(redirectUrl);
   } catch (err) {
     console.error(`❌ ${providerName} OAuth token generation failed:`, err);
     return redirectToSignin(res, `${providerName.toLowerCase()}_token_failed`);
   }
 };
-
 
 router.get(
   "/google",
