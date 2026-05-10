@@ -8,6 +8,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 
 const router = express.Router();
+const util = require('util');
 
 // SIGNUP ROUTE
 // SIGNUP ROUTE
@@ -259,14 +260,19 @@ router.get(
 router.get(
   "/google/callback",
   (req, res, next) => {
+    // Log incoming query params so we can inspect the authorization code / redirect details
+    console.log('🔍 Google callback query:', req.query);
+
     passport.authenticate("google", { session: false }, (err, user, info) => {
       if (err) {
-        console.error("❌ Google OAuth error:", err);
+        // Log full error including non-enumerable properties returned by the OAuth library
+        console.error("❌ Google OAuth error (detailed):", util.inspect(err, { showHidden: true, depth: 5 }));
+        console.error("❌ Google OAuth info:", util.inspect(info, { showHidden: true, depth: 5 }));
         return redirectToSignin(res, "google_auth_failed");
       }
 
       if (!user) {
-        console.error("❌ Google OAuth returned no user:", info);
+        console.error("❌ Google OAuth returned no user:", util.inspect(info, { showHidden: true, depth: 5 }));
         return redirectToSignin(res, "google_no_user");
       }
 
@@ -290,14 +296,17 @@ router.get(
 router.get(
   "/github/callback",
   (req, res, next) => {
+    console.log('🔍 GitHub callback query:', req.query);
+
     passport.authenticate("github", { session: false }, (err, user, info) => {
       if (err) {
-        console.error("❌ GitHub OAuth error:", err);
+        console.error("❌ GitHub OAuth error (detailed):", util.inspect(err, { showHidden: true, depth: 5 }));
+        console.error("❌ GitHub OAuth info:", util.inspect(info, { showHidden: true, depth: 5 }));
         return redirectToSignin(res, "github_auth_failed");
       }
 
       if (!user) {
-        console.error("❌ GitHub OAuth returned no user:", info);
+        console.error("❌ GitHub OAuth returned no user:", util.inspect(info, { showHidden: true, depth: 5 }));
         return redirectToSignin(res, "github_no_user");
       }
 
