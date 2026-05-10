@@ -61,6 +61,32 @@ connectDB();
 // Start server
 const PORT = process.env.PORT || 5000;
 
+// Global error handler — convert unexpected errors into friendly redirects for OAuth flows
+// This prevents the browser from showing chrome-error:// pages during OAuth redirects.
+app.use((err, req, res, next) => {
+  console.error("Global error handler:", err && err.stack ? err.stack : err);
+
+  const frontend = process.env.FRONTEND_URL || "http://localhost:5173";
+
+  // If the request was for an auth callback, redirect the user back to sign-in with an error
+  if (req && req.originalUrl && req.originalUrl.startsWith("/api/auth")) {
+    try {
+      return res.redirect(`${frontend}/signin?error=server_error`);
+    } catch (e) {
+      // fallback to JSON
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
+
+  // Generic API error response for other routes
+  if (req && req.originalUrl && req.originalUrl.startsWith("/api/")) {
+    return res.status(500).json({ message: "Server error" });
+  }
+
+  // For non-API requests, just show a generic error
+  res.status(500).send("Server error");
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
