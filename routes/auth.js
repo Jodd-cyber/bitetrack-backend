@@ -268,6 +268,10 @@ router.get(
         // Log full error including non-enumerable properties returned by the OAuth library
         console.error("❌ Google OAuth error (detailed):", util.inspect(err, { showHidden: true, depth: 5 }));
         console.error("❌ Google OAuth info:", util.inspect(info, { showHidden: true, depth: 5 }));
+        // If Google specifically returned invalid_grant (bad/expired/used code or redirect mismatch), surface that
+        if (err && err.code === 'invalid_grant') {
+          return redirectToSignin(res, "google_invalid_grant");
+        }
         return redirectToSignin(res, "google_auth_failed");
       }
 
@@ -302,6 +306,9 @@ router.get(
       if (err) {
         console.error("❌ GitHub OAuth error (detailed):", util.inspect(err, { showHidden: true, depth: 5 }));
         console.error("❌ GitHub OAuth info:", util.inspect(info, { showHidden: true, depth: 5 }));
+        if (err && err.code === 'invalid_grant') {
+          return redirectToSignin(res, "github_invalid_grant");
+        }
         return redirectToSignin(res, "github_auth_failed");
       }
 
