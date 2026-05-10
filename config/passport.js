@@ -2,14 +2,12 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/User");
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
-
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: `${BACKEND_URL}/api/auth/google/callback`,
+      callbackURL: "/api/auth/google/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -49,8 +47,8 @@ passport.use(
     {
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: `${BACKEND_URL}/api/auth/github/callback`,
-      scope: ["user:email"],
+      callbackURL: "/api/auth/github/callback",
+      scope: ["user:email"], // 🔥 important to get email
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -83,21 +81,5 @@ passport.use(
     }
   )
 );
-
-// ✅ REQUIRED: Passport serialization methods
-// Even with session: false, these must be defined for Passport to work
-passport.serializeUser((user, done) => {
-  done(null, user._id);
-});
-
-passport.deserializeUser((id, done) => {
-  User.findById(id)
-    .then((user) => {
-      done(null, user);
-    })
-    .catch((err) => {
-      done(err, null);
-    });
-});
 
 module.exports = passport;
