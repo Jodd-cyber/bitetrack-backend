@@ -212,6 +212,41 @@ router.post("/reset-password/:token", async (req, res) => {
   });
 });
 
+const redirectToSignin = (res, error) => {
+  return res.redirect(`${FRONTEND_URL}/signin?error=${error}`);
+};
+
+const completeOAuthLogin = async (req, res, providerName) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      console.error(`❌ ${providerName} OAuth completed without a user`);
+      return redirectToSignin(res, `${providerName.toLowerCase()}_no_user`);
+    }
+
+    if (!user._id || !user.name || !user.email) {
+      console.error(`❌ ${providerName} OAuth user is missing required fields`, user);
+      return redirectToSignin(res, `${providerName.toLowerCase()}_invalid_user`);
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "2h" }
+    );
+
+    return res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
+  } catch (err) {
+    console.error(`❌ ${providerName} OAuth token generation failed:`, err);
+    return redirectToSignin(res, `${providerName.toLowerCase()}_token_failed`);
+  }
+};
+
 
 router.get(
   "/google",
@@ -223,42 +258,11 @@ router.get(
 
 router.get(
   "/google/callback",
-  (req, res, next) => {
-    console.log("🔴 Google callback received");
-    
-    passport.authenticate("google", { session: false }, (err, user, info) => {
-      if (err) {
-        console.error("❌ Google OAuth Error:", err.message);
-        // ✅ Redirect to FRONTEND with error
-        return res.redirect(`${FRONTEND_URL}/signin?error=oauth_failed`);
-      }
-      if (!user) {
-        console.error("❌ No user from Google");
-        // ✅ Redirect to FRONTEND with error
-        return res.redirect(`${FRONTEND_URL}/signin?error=no_user`);
-      }
-      console.log("✅ User authenticated:", user.email);
-      req.user = user;
-      next();
-    })(req, res, next);
-  },
-  async (req, res) => {
-    try {
-      const token = jwt.sign(
-        { userId: req.user._id, name: req.user.name, email: req.user.email },
-        process.env.JWT_SECRET,
-        { expiresIn: "2h" }
-      );
-      
-      // ✅ IMPORTANT: Redirect to FRONTEND (not backend)
-      console.log("✅ Redirecting to frontend with token");
-      return res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
-    } catch (err) {
-      console.error("❌ Token Generation Error:", err);
-      // ✅ Redirect to FRONTEND with error
-      return res.redirect(`${FRONTEND_URL}/signin?error=token_failed`);
-    }
-  }
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: `${FRONTEND_URL}/signin?error=google_auth_failed`,
+  }),
+  (req, res) => completeOAuthLogin(req, res, "Google")
 );
 
 router.get(
@@ -273,45 +277,11 @@ router.get(
 
 router.get(
   "/github/callback",
-  (req, res, next) => {
-    passport.authenticate("github", {
-      session: false,
-      failureRedirect: `${FRONTEND_URL}/signin?error=auth_failed`,
-    }, (err, user, info) => {
-      if (err) {
-        console.error("GitHub OAuth Error:", err);
-        return res.redirect(`${FRONTEND_URL}/signin?error=server_error`);
-      }
-      
-      if (!user) {
-        console.error("No user returned from GitHub");
-        return res.redirect(`${FRONTEND_URL}/signin?error=no_user`);
-      }
-      
-      req.user = user;
-      next();
-    })(req, res, next);
-  },
-  async (req, res) => {
-    try {
-      const user = req.user;
-
-      const token = jwt.sign(
-        {
-          userId: user._id,
-          name: user.name,
-          email: user.email,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: "2h" }
-      );
-
-      res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
-    } catch (err) {
-      console.error("Token Generation Error:", err);
-      res.redirect(`${FRONTEND_URL}/signin?error=token_failed`);
-    }
-  }
+  passport.authenticate("github", {
+    session: false,
+    failureRedirect: `${FRONTEND_URL}/signin?error=github_auth_failed`,
+  }),
+  (req, res) => completeOAuthLogin(req, res, "GitHub")
 );
 
 
