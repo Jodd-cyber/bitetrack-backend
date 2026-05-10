@@ -25,7 +25,7 @@ app.use(cors({
     process.env.FRONTEND_URL
   ].filter(Boolean),
   credentials: true
-});
+}));
 
 const passport = require("passport");
 app.use(passport.initialize());
