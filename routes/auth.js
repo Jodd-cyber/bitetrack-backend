@@ -241,7 +241,7 @@ const completeOAuthLogin = async (req, res, providerName) => {
       { expiresIn: "2h" }
     );
 
-    return res.redirect(`${FRONTEND_URL}/?token=${token}`);
+    return res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
   } catch (err) {
     console.error(`❌ ${providerName} OAuth token generation failed:`, err);
     return redirectToSignin(res, `${providerName.toLowerCase()}_token_failed`);
