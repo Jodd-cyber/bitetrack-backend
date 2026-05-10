@@ -229,9 +229,12 @@ router.get(
   }),
   async (req, res) => {
     try {
-      
-
       const user = req.user;
+
+      if (!user) {
+        console.error("❌ User not found in req.user after Google auth");
+        return res.redirect(`${FRONTEND_URL}/signin?error=no_user`);
+      }
 
       // Generate JWT (same as your login)
       const token = jwt.sign(
@@ -247,8 +250,8 @@ router.get(
       // Redirect to frontend with token
       res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
     } catch (err) {
-      console.error(err);
-      res.redirect(`${FRONTEND_URL}/signin`);
+      console.error("❌ Google callback error:", err);
+      res.status(500).json({ error: err.message });
     }
   }
 );
@@ -274,6 +277,11 @@ router.get(
     try {
       const user = req.user;
 
+      if (!user) {
+        console.error("❌ User not found in req.user after GitHub auth");
+        return res.redirect(`${FRONTEND_URL}/signin?error=no_user`);
+      }
+
       const token = jwt.sign(
         {
           userId: user._id,
@@ -287,8 +295,8 @@ router.get(
       // 🔥 redirect to frontend (same as Google)
       res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
     } catch (err) {
-      console.error(err);
-      res.redirect(`${FRONTEND_URL}/signin`);
+      console.error("❌ GitHub callback error:", err);
+      res.status(500).json({ error: err.message });
     }
   }
 );
