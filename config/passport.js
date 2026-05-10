@@ -5,13 +5,15 @@ const User = require("../models/User");
 console.log("GOOGLE CLIENT:", process.env.GOOGLE_CLIENT_ID);
 console.log("GOOGLE SECRET:", process.env.GOOGLE_CLIENT_SECRET);
 
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
+
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "https://bitetrack-backend-yfkf.onrender.com/api/auth/google/callback",
-      proxy: true, // ✅ REQUIRED on Render/behind proxy
+      callbackURL: `${BACKEND_URL}/api/auth/google/callback`, // ✅ USE ENV VAR
+      proxy: true,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -41,9 +43,9 @@ passport.use(
     {
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: "https://bitetrack-backend-yfkf.onrender.com/api/auth/github/callback",
+      callbackURL: `${BACKEND_URL}/api/auth/github/callback`, // ✅ USE ENV VAR
       scope: ["user:email"],
-      proxy: true, // 🔥 ADD THIS LINE TOO
+      proxy: true,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -69,7 +71,7 @@ passport.use(
 
         return done(null, user);
       } catch (err) {
-        console.error("GitHub Strategy Error:", err); // 🔥 ADD ERROR LOGGING
+        console.error("GitHub Strategy Error:", err);
         return done(err, null);
       }
     }
