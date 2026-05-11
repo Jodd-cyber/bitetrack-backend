@@ -244,10 +244,10 @@ const completeOAuthLogin = async (req, res, providerName) => {
       { expiresIn: "2h" }
     );
 
-    console.log(`✅ ${providerName}: JWT generated`); // ✅ ADD THIS
-    const redirectUrl = `${FRONTEND_URL}/oauth-success?token=${token}`;
-    console.log(`📍 ${providerName}: Redirecting to: ${redirectUrl}`); // ✅ ADD THIS
-    console.log(`🎯 FRONTEND_URL used: ${FRONTEND_URL}`); // ✅ ADD THIS
+    console.log(`✅ ${providerName}: JWT generated`);
+    const redirectUrl = `${FRONTEND_URL}/oauth-success?token=${encodeURIComponent(token)}&name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user._id)}`;
+    console.log(`📍 ${providerName}: Redirecting to: ${redirectUrl}`);
+    console.log(`🎯 FRONTEND_URL used: ${FRONTEND_URL}`);
 
     return res.redirect(redirectUrl);
   } catch (err) {
