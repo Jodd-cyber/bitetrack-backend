@@ -77,12 +77,70 @@ User's query: "${message}"
 
 Please provide a helpful, friendly, and concise answer. If they ask about calories, use their BMR to advise them. If they ask for a weekly summary, summarize their spending and eating habits from the logs provided. Do not invent any data.`;
 
+    // Define the tools for the AI to use
+    const tools = [
+      {
+        functionDeclarations: [
+          {
+            name: "addFoodLog",
+            description: "Log a new food entry/order for the user in the database. Call this when the user explicitly asks you to log, save, or record something they ate.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                mealType: { type: "STRING", description: "Must be one of: Breakfast, Lunch, Dinner, Snack" },
+                restaurant: { type: "STRING", description: "Name of the restaurant, brand, or 'Home'" },
+                amount: { type: "NUMBER", description: "Total cost or amount spent. Use 0 if unknown or home cooked." },
+                items: { 
+                  type: "ARRAY", 
+                  description: "List of food items eaten",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      name: { type: "STRING", description: "Name of the food item (e.g. Pizza, Salad)" },
+                      quantity: { type: "NUMBER", description: "Quantity of this item" }
+                    }
+                  }
+                },
+                notes: { type: "STRING", description: "Any additional context or notes" }
+              },
+              required: ["mealType", "restaurant", "amount", "items"]
+            }
+          }
+        ]
+      }
+    ];
+
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", tools: tools });
 
     const result = await model.generateContent(systemPrompt);
-    const responseText = result.response.text();
+    
+    // Check if the AI decided to call a function
+    const calls = result.response.functionCalls();
+    if (calls && calls.length > 0) {
+      const call = calls[0];
+      if (call.name === "addFoodLog") {
+        const { mealType, restaurant, amount, items, notes } = call.args;
+        
+        const newLog = new FoodLog({
+          user: req.user.id,
+          date: new Date(),
+          mealType: mealType || 'Snack',
+          restaurant: restaurant || 'Unknown',
+          amount: amount || 0,
+          items: items || [],
+          notes: notes || ""
+        });
+        
+        await newLog.save();
+        
+        // Return a custom success message without needing a second API call
+        const foodNames = items ? items.map(i => i.name).join(', ') : 'your meal';
+        return res.json({ reply: `✅ Successfully logged **${foodNames}** for ${mealType} at ${restaurant} (₹${amount}). I have saved this directly to your database!` });
+      }
+    }
 
+    const responseText = result.response.text();
     res.json({ reply: responseText });
 
   } catch (err) {
