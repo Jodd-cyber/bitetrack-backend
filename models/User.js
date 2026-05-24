@@ -7,6 +7,13 @@ const userSchema = new mongoose.Schema(
     password: { type: String },
     resetPasswordToken: String,
     resetPasswordExpires: Date,
+    profile: {
+      age: { type: Number },
+      height: { type: Number }, // in cm
+      weight: { type: Number }, // in kg
+      gender: { type: String, enum: ['male', 'female', 'other', ''] },
+      goal: { type: String, enum: ['lose', 'maintain', 'gain', ''] }
+    }
   },
   { timestamps: true }
 );

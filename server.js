@@ -44,6 +44,7 @@ app.use("/api/foodlogs", foodlogRoutes);
 app.use("/api/user", require("./routes/user"));
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/budget", budgetRoutes);
+app.use("/api/ai", require("./routes/ai"));
 // DB Connection
 async function connectDB() {
   try {
