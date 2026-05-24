@@ -5,7 +5,7 @@ const User = require("../models/User");
 console.log("GOOGLE CLIENT:", process.env.GOOGLE_CLIENT_ID);
 console.log("GOOGLE SECRET:", process.env.GOOGLE_CLIENT_SECRET);
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
+const BACKEND_URL = process.env.BACKEND_URL || "https://bitetrack-backend-yfkf.onrender.com";
 
 passport.use(
   new GoogleStrategy(

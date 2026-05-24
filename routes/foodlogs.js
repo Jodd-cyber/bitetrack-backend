@@ -4,9 +4,6 @@ const auth = require('../middleware/auth');
 const FoodLog = require('../models/FoodLog');
 const mongoose = require('mongoose');
 
-
-
-
 // Create a food log (protected)
 router.post('/', auth, async (req, res) => {
   try {
@@ -17,12 +14,13 @@ router.post('/', auth, async (req, res) => {
     const newLog = new FoodLog({
       user: req.user.id,
       items: req.body.items || [],
+      amount: Number(req.body.amount) || 0,
       notes: req.body.notes || '',
       restaurant: req.body.restaurant || '',
 
       mealType: req.body.mealType || "Lunch",
       date: req.body.date,
-      time: req.body.time || "",   // ✅ already correct
+      time: req.body.time || "",
       rating: Number(req.body.rating) || 0
     });
 
@@ -46,13 +44,7 @@ router.get('/', auth, async (req, res) => {
     const logs = await FoodLog.find({ user: req.user.id })
       .sort({ createdAt: -1 });
 
-    // ✅ FIX: ensure rating is always number
-    const formattedLogs = logs.map(log => ({
-      ...log.toObject(),
-      rating: Number(log.rating) || 0
-    }));
-
-    res.json(formattedLogs);
+    res.json(logs);
 
   } catch (err) {
     console.error(err);
@@ -99,14 +91,14 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(401).json({ message: "Not authorized" });
     }
 
-    // ✅ update BEFORE save
     log.items = req.body.items || [];
+    log.amount = Number(req.body.amount) || 0;
     log.notes = req.body.notes || '';
     log.restaurant = req.body.restaurant || '';
 
     log.mealType = req.body.mealType || "Lunch";
     log.date = req.body.date;
-    log.time = req.body.time || "";   // ✅ correct
+    log.time = req.body.time || "";
     log.rating = Number(req.body.rating) || 0;
 
     await log.save();
@@ -118,6 +110,5 @@ router.put('/:id', auth, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
 
 module.exports = router;

@@ -2,12 +2,12 @@ require("dotenv").config();
 require("./config/passport");
 const mongoose = require("mongoose");
 const express = require("express");
-const cors = require("cors");
+const cors = require("cors");    
 
 const authRoutes = require("./routes/auth");
 const foodlogRoutes = require("./routes/foodlogs");
 const feedbackRoutes = require("./routes/feedbackRoutes");
-
+const budgetRoutes = require("./routes/budget");
 const app = express();
 
 app.set("trust proxy", 1); // ✅ MUST BE HERE (top, before routes)
@@ -43,7 +43,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/foodlogs", foodlogRoutes);
 app.use("/api/user", require("./routes/user"));
 app.use("/api/feedback", feedbackRoutes);
-const budgetRoutes = require("./routes/budget");
 app.use("/api/budget", budgetRoutes);
 // DB Connection
 async function connectDB() {

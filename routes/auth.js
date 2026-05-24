@@ -4,13 +4,13 @@ const User = require("../models/User");
 const jwt = require('jsonwebtoken');
 const passport = require("passport");
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://bitetrack-frontenddd.vercel.app";
 
 
 const router = express.Router();
 const util = require('util');
 
-// SIGNUP ROUTE
+
 // SIGNUP ROUTE
 router.post("/signup", async (req, res) => {
   try {
