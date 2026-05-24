@@ -16,14 +16,9 @@ app.set("trust proxy", 1); // ✅ MUST BE HERE (top, before routes)
 app.use(express.json());
 
 app.use(cors({
-  origin: [
-    "https://bitetrack-frontenddd.vercel.app",
-    "https://bitetrack-frontendd-git-main-batraakshat25-5082s-projects.vercel.app",
-    "https://bitetrack-frontendd-nk3t58d9f-batraakshat25-5082s-projects.vercel.app",
-    "http://localhost:5173",
-    "https://bitetrack-frontend.onrender.com",
-    process.env.FRONTEND_URL
-  ].filter(Boolean),
+  origin: function (origin, callback) {
+    callback(null, true); // Allow all origins for now to prevent CORS issues on Vercel preview URLs
+  },
   credentials: true
 }));
 
