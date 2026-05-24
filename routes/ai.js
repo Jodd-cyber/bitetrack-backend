@@ -78,7 +78,7 @@ User's query: "${message}"
 Please provide a helpful, friendly, and concise answer. If they ask about calories, use their BMR to advise them. If they ask for a weekly summary, summarize their spending and eating habits from the logs provided. Do not invent any data.`;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const result = await model.generateContent(systemPrompt);
     const responseText = result.response.text();
