@@ -35,17 +35,17 @@ router.post('/chat', auth, async (req, res) => {
       tdee = bmr * 1.2; // Sedentary multiplier
     }
 
-    // 2. Fetch last 7 days of food logs
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // 2. Fetch last 30 days of food logs
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const logs = await FoodLog.find({
       user: req.user.id,
-      date: { $gte: sevenDaysAgo }
+      date: { $gte: thirtyDaysAgo }
     }).sort({ date: 1 });
 
     const totalSpent = logs.reduce((sum, log) => sum + (log.amount || 0), 0);
 
-    let formattedLogs = 'No food logs recorded in the last 7 days.';
+    let formattedLogs = 'No food logs recorded in the last 30 days.';
     try {
       if (logs && logs.length > 0) {
         formattedLogs = logs.map(l => {
@@ -69,9 +69,9 @@ Gender: ${profile.gender || 'Unknown'}
 Goal: ${profile.goal || 'Unknown'}
 ${bmr ? `Calculated Basal Metabolic Rate (BMR): ~${Math.round(bmr)} kcal/day. Maintenance Calories: ~${Math.round(tdee)} kcal/day.` : 'Not enough profile data to calculate exact calorie needs.'}
 
-Here are the user's food logs for the past 7 days:
+Here are the user's food logs for the past 30 days:
 ${formattedLogs}
-Total spent in the last 7 days: ₹${totalSpent}.
+Total spent in the last 30 days: ₹${totalSpent}.
 
 User's query: "${message}"
 
