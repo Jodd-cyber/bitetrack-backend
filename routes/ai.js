@@ -87,7 +87,7 @@ Please provide a helpful, friendly, and concise answer. If they ask about calori
 
   } catch (err) {
     console.error("AI Chat Error:", err);
-    res.status(500).json({ message: "Failed to generate AI response" });
+    res.status(500).json({ message: `AI Error: ${err.message}` });
   }
 });
 
