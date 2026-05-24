@@ -45,7 +45,20 @@ router.post('/chat', auth, async (req, res) => {
 
     const totalSpent = logs.reduce((sum, log) => sum + (log.amount || 0), 0);
 
-    // 3. Construct System Prompt
+    let formattedLogs = 'No food logs recorded in the last 7 days.';
+    try {
+      if (logs && logs.length > 0) {
+        formattedLogs = logs.map(l => {
+          const dateStr = l.date ? new Date(l.date).toISOString().split('T')[0] : 'Unknown';
+          const itemsStr = (l.items && Array.isArray(l.items)) ? l.items.map(i => i?.name || 'Unknown').join(', ') : 'None';
+          return `- Date: ${dateStr}, Meal: ${l.mealType || 'Unknown'}, Amount Spent: ₹${l.amount || 0}, Items: ${itemsStr}`;
+        }).join('\n');
+      }
+    } catch (formattingError) {
+      console.error("Error formatting logs:", formattingError);
+      formattedLogs = "Error reading recent food logs. Please continue assisting the user without them.";
+    }
+
     const systemPrompt = `You are an intelligent health and finance assistant named BiteTrack AI. 
 The user is asking you a question about their diet, expenses, or health.
 Here is the user's profile:
@@ -57,7 +70,7 @@ Goal: ${profile.goal || 'Unknown'}
 ${bmr ? `Calculated Basal Metabolic Rate (BMR): ~${Math.round(bmr)} kcal/day. Maintenance Calories: ~${Math.round(tdee)} kcal/day.` : 'Not enough profile data to calculate exact calorie needs.'}
 
 Here are the user's food logs for the past 7 days:
-${logs.length > 0 ? logs.map(l => `- Date: ${l.date ? new Date(l.date).toISOString().split('T')[0] : 'Unknown'}, Meal: ${l.mealType}, Amount Spent: ₹${l.amount}, Items: ${l.items ? l.items.map(i => i.name).join(', ') : 'None'}`).join('\n') : 'No food logs recorded in the last 7 days.'}
+${formattedLogs}
 Total spent in the last 7 days: ₹${totalSpent}.
 
 User's query: "${message}"
