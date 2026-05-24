@@ -5,8 +5,6 @@ const User = require('../models/User');
 const FoodLog = require('../models/FoodLog');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 router.post('/chat', auth, async (req, res) => {
   try {
     const { message } = req.body;
@@ -66,6 +64,7 @@ User's query: "${message}"
 
 Please provide a helpful, friendly, and concise answer. If they ask about calories, use their BMR to advise them. If they ask for a weekly summary, summarize their spending and eating habits from the logs provided. Do not invent any data.`;
 
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const result = await model.generateContent(systemPrompt);
