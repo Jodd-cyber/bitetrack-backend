@@ -57,7 +57,7 @@ Goal: ${profile.goal || 'Unknown'}
 ${bmr ? `Calculated Basal Metabolic Rate (BMR): ~${Math.round(bmr)} kcal/day. Maintenance Calories: ~${Math.round(tdee)} kcal/day.` : 'Not enough profile data to calculate exact calorie needs.'}
 
 Here are the user's food logs for the past 7 days:
-${logs.length > 0 ? logs.map(l => `- Date: ${l.date ? new Date(l.date).toISOString().split('T')[0] : 'Unknown'}, Meal: ${l.mealType}, Amount Spent: ₹${l.amount}, Items: ${l.items.map(i => i.name).join(', ')}`).join('\n') : 'No food logs recorded in the last 7 days.'}
+${logs.length > 0 ? logs.map(l => `- Date: ${l.date ? new Date(l.date).toISOString().split('T')[0] : 'Unknown'}, Meal: ${l.mealType}, Amount Spent: ₹${l.amount}, Items: ${l.items ? l.items.map(i => i.name).join(', ') : 'None'}`).join('\n') : 'No food logs recorded in the last 7 days.'}
 Total spent in the last 7 days: ₹${totalSpent}.
 
 User's query: "${message}"
