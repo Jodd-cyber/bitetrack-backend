@@ -51,7 +51,7 @@ router.post('/chat', auth, async (req, res) => {
         formattedLogs = logs.map(l => {
           const dateStr = l.date ? new Date(l.date).toISOString().split('T')[0] : 'Unknown';
           const itemsStr = (l.items && Array.isArray(l.items)) ? l.items.map(i => i?.name || 'Unknown').join(', ') : 'None';
-          return `- Date: ${dateStr}, Meal: ${l.mealType || 'Unknown'}, Amount Spent: ₹${l.amount || 0}, Items: ${itemsStr}`;
+          return `- [ID: ${l._id}] Date: ${dateStr}, Meal: ${l.mealType || 'Unknown'}, Amount Spent: ₹${l.amount || 0}, Items: ${itemsStr}`;
         }).join('\n');
       }
     } catch (formattingError) {
@@ -60,7 +60,7 @@ router.post('/chat', auth, async (req, res) => {
     }
 
     const systemPrompt = `You are an intelligent health and finance assistant named BiteTrack AI. 
-The user is asking you a question about their diet, expenses, or health.
+The user is asking you a question about their diet, expenses, or health, OR asking you to perform an action.
 Here is the user's profile:
 Age: ${profile.age || 'Unknown'}
 Height: ${profile.height ? profile.height + ' cm' : 'Unknown'}
@@ -75,7 +75,7 @@ Total spent in the last 30 days: ₹${totalSpent}.
 
 User's query: "${message}"
 
-Please provide a helpful, friendly, and concise answer. If they ask about calories, use their BMR to advise them. If they ask for a weekly summary, summarize their spending and eating habits from the logs provided. Do not invent any data.`;
+Please provide a helpful, friendly, and concise answer. Do not invent any data.`;
 
     // Define the tools for the AI to use
     const tools = [
@@ -105,6 +105,31 @@ Please provide a helpful, friendly, and concise answer. If they ask about calori
               },
               required: ["mealType", "restaurant", "amount", "items"]
             }
+          },
+          {
+            name: "deleteFoodLog",
+            description: "Delete a specific food log from the database. Call this when the user asks you to remove, delete, or undo a food log. You MUST use the ID provided in the system prompt logs.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                logId: { type: "STRING", description: "The exact [ID: ...] string of the log to delete" }
+              },
+              required: ["logId"]
+            }
+          },
+          {
+            name: "updateProfile",
+            description: "Update the user's personal profile (weight, height, age, gender, goal). Call this when they say things like 'my new weight is', 'set my goal to', 'I am 25 years old'.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                weight: { type: "NUMBER", description: "User's weight in kg" },
+                height: { type: "NUMBER", description: "User's height in cm" },
+                age: { type: "NUMBER", description: "User's age in years" },
+                gender: { type: "STRING", description: "User's gender (male, female, other)" },
+                goal: { type: "STRING", description: "User's goal (lose, maintain, gain)" }
+              }
+            }
           }
         ]
       }
@@ -119,9 +144,9 @@ Please provide a helpful, friendly, and concise answer. If they ask about calori
     const calls = result.response.functionCalls();
     if (calls && calls.length > 0) {
       const call = calls[0];
+      
       if (call.name === "addFoodLog") {
         const { mealType, restaurant, amount, items, notes } = call.args;
-        
         const newLog = new FoodLog({
           user: req.user.id,
           date: new Date(),
@@ -131,12 +156,28 @@ Please provide a helpful, friendly, and concise answer. If they ask about calori
           items: items || [],
           notes: notes || ""
         });
-        
         await newLog.save();
-        
-        // Return a custom success message without needing a second API call
         const foodNames = items ? items.map(i => i.name).join(', ') : 'your meal';
         return res.json({ reply: `✅ Successfully logged **${foodNames}** for ${mealType} at ${restaurant} (₹${amount}). I have saved this directly to your database!` });
+      }
+
+      if (call.name === "deleteFoodLog") {
+        const { logId } = call.args;
+        const deleted = await FoodLog.findOneAndDelete({ _id: logId, user: req.user.id });
+        if (deleted) {
+          return res.json({ reply: `🗑️ Successfully deleted the log from ${deleted.date ? new Date(deleted.date).toLocaleDateString() : 'that day'}.` });
+        } else {
+          return res.json({ reply: `❌ I couldn't find a log with that exact ID to delete, or it might have already been removed.` });
+        }
+      }
+
+      if (call.name === "updateProfile") {
+        const updates = call.args;
+        if (Object.keys(updates).length > 0) {
+          user.profile = { ...user.profile, ...updates };
+          await user.save();
+          return res.json({ reply: `✅ I have successfully updated your profile with the new information!` });
+        }
       }
     }
 
