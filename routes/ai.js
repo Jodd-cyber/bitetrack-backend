@@ -184,7 +184,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
     ];
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest", tools: tools });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", tools: tools });
 
     const result = await model.generateContent(systemPrompt);
     
@@ -319,7 +319,7 @@ router.post('/scan-receipt', auth, async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `You are an expert receipt parser. Look at this receipt image and extract the following information.
 You must return the result STRICTLY as a JSON object with no markdown formatting or extra text.
