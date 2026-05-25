@@ -163,10 +163,10 @@ Email Text:
 ${emailText.substring(0, 5000)}
 `;
 
-      const result = await model.generateContent(prompt);
-      const jsonStr = result.response.text().replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
-      
       try {
+        const result = await model.generateContent(prompt);
+        const jsonStr = result.response.text().replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+        
         const parsed = JSON.parse(jsonStr);
         if (parsed.invalid || !parsed.restaurant || !parsed.amount) continue;
 
@@ -192,15 +192,15 @@ ${emailText.substring(0, 5000)}
           await newLog.save();
           newOrdersCount++;
         }
-      } catch (parseErr) {
-        console.error("Failed to parse Gemini output for email:", parseErr);
+      } catch (aiErr) {
+        console.error("Failed to process email with AI:", aiErr.message);
       }
     }
 
     res.json({ success: true, newOrders: newOrdersCount, message: `Successfully synced ${newOrdersCount} new orders!` });
   } catch (err) {
     console.error("Email sync error:", err);
-    res.status(500).json({ message: "Failed to sync emails" });
+    res.status(500).json({ message: "Failed to sync emails: " + err.message });
   }
 });
 
