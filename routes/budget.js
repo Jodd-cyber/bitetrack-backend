@@ -6,7 +6,7 @@ const { protect } = require("../middleware/authMiddleware");
 // CREATE or UPDATE budget
 router.post("/", protect, async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, saveForAllMonths } = req.body;
 
     const userId = req.user.id;
     const now = new Date();
@@ -17,6 +17,7 @@ router.post("/", protect, async (req, res) => {
 
     if (budget) {
       budget.amount = amount;
+      budget.saveForAllMonths = saveForAllMonths || false;
       await budget.save();
     } else {
       budget = await Budget.create({
@@ -24,6 +25,7 @@ router.post("/", protect, async (req, res) => {
         amount,
         month,
         year,
+        saveForAllMonths: saveForAllMonths || false,
       });
     }
 
@@ -42,7 +44,15 @@ router.get("/", protect, async (req, res) => {
     const month = now.getMonth();
     const year = now.getFullYear();
 
-    const budget = await Budget.findOne({ userId, month, year });
+    let budget = await Budget.findOne({ userId, month, year });
+
+    if (!budget) {
+      // Look for a carry-over budget
+      const carryOverBudget = await Budget.findOne({ userId, saveForAllMonths: true }).sort({ createdAt: -1 });
+      if (carryOverBudget) {
+        budget = carryOverBudget;
+      }
+    }
 
     res.json({ success: true, data: budget });
   } catch (err) {

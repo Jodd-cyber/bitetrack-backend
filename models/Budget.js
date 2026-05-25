@@ -18,6 +18,10 @@ const budgetSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  saveForAllMonths: {
+    type: Boolean,
+    default: false,
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model("Budget", budgetSchema);
