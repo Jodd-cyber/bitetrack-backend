@@ -310,12 +310,27 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
                 let emailText = "";
                 const extractText = (parts) => {
                   for (let part of parts) {
-                    if (part.mimeType === 'text/plain') emailText += Buffer.from(part.body.data, 'base64').toString('utf-8');
+                    if (part.mimeType === 'text/plain' || part.mimeType === 'text/html') {
+                      if (part.body && part.body.data) {
+                        let decoded = Buffer.from(part.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
+                        if (part.mimeType === 'text/html') {
+                          // Strip simple HTML tags to reduce token size, keep text
+                          decoded = decoded.replace(/<style[^>]*>.*?<\/style>/gi, '')
+                                           .replace(/<script[^>]*>.*?<\/script>/gi, '')
+                                           .replace(/<[^>]+>/g, ' ')
+                                           .replace(/\s+/g, ' ');
+                        }
+                        emailText += decoded + "\n";
+                      }
+                    }
                     else if (part.parts) extractText(part.parts);
                   }
                 };
                 if (msgData.data.payload.parts) extractText(msgData.data.payload.parts);
-                else if (msgData.data.payload.body.data) emailText = Buffer.from(msgData.data.payload.body.data, 'base64').toString('utf-8');
+                else if (msgData.data.payload.body.data) {
+                   let decoded = Buffer.from(msgData.data.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
+                   emailText = decoded.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                }
                 
                 if (!emailText.trim()) continue;
 

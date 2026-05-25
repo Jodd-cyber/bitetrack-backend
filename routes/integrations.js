@@ -136,8 +136,17 @@ router.post('/sync-emails', auth, async (req, res) => {
       let emailText = "";
       const extractText = (parts) => {
         for (let part of parts) {
-          if (part.mimeType === 'text/plain') {
-            emailText += Buffer.from(part.body.data, 'base64').toString('utf-8');
+          if (part.mimeType === 'text/plain' || part.mimeType === 'text/html') {
+            if (part.body && part.body.data) {
+              let decoded = Buffer.from(part.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
+              if (part.mimeType === 'text/html') {
+                decoded = decoded.replace(/<style[^>]*>.*?<\/style>/gi, '')
+                                 .replace(/<script[^>]*>.*?<\/script>/gi, '')
+                                 .replace(/<[^>]+>/g, ' ')
+                                 .replace(/\s+/g, ' ');
+              }
+              emailText += decoded + "\n";
+            }
           } else if (part.parts) {
             extractText(part.parts);
           }
@@ -147,7 +156,8 @@ router.post('/sync-emails', auth, async (req, res) => {
       if (msgData.data.payload.parts) {
         extractText(msgData.data.payload.parts);
       } else if (msgData.data.payload.body.data) {
-        emailText = Buffer.from(msgData.data.payload.body.data, 'base64').toString('utf-8');
+        let decoded = Buffer.from(msgData.data.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
+        emailText = decoded.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
       }
 
       if (!emailText.trim()) continue;
