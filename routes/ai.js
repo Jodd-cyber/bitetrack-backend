@@ -103,7 +103,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
                     }
                   }
                 },
-                notes: { type: "STRING", description: "Any additional context or notes" }
+                notes: { type: "STRING", description: "Any additional context or notes. Do NOT include ratings here, use the rating field instead." }
               },
               required: ["mealType", "restaurant", "amount", "items"]
             }
@@ -142,7 +142,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
                     }
                   }
                 },
-                notes: { type: "STRING", description: "Any additional context or notes" }
+                notes: { type: "STRING", description: "Any additional context or notes. Do NOT include ratings here, use the rating field instead." }
               },
               required: ["logId"]
             }
@@ -177,6 +177,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
       
       if (call.name === "addFoodLog") {
         const { mealType, restaurant, amount, items, notes, time, rating } = call.args;
+        let cleanNotes = notes ? notes.replace(/rated\s*\d+\s*stars?/gi, '').trim() : "";
         const newLog = new FoodLog({
           user: req.user.id,
           date: new Date(),
@@ -184,7 +185,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
           restaurant: restaurant || 'Unknown',
           amount: amount || 0,
           items: items || [],
-          notes: notes || "",
+          notes: cleanNotes,
           time: time || "",
           rating: rating || 0
         });
@@ -210,7 +211,9 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
         if (restaurant !== undefined) updates.restaurant = restaurant;
         if (amount !== undefined) updates.amount = amount;
         if (items !== undefined) updates.items = items;
-        if (notes !== undefined) updates.notes = notes;
+        if (notes !== undefined) {
+          updates.notes = notes ? notes.replace(/rated\s*\d+\s*stars?/gi, '').trim() : "";
+        }
         if (time !== undefined) updates.time = time;
         if (rating !== undefined) updates.rating = rating;
 
