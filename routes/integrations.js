@@ -104,11 +104,11 @@ router.post('/sync-emails', auth, async (req, res) => {
     // And from addresses are specific
     const query = '(from:noreply@zomato.com OR from:swiggy@swiggy.in OR from:noreply@swiggy.in) (subject:"Order" OR subject:"Receipt" OR subject:"Summary")';
     
-    // Fetch last 10 messages that match
+    // Fetch last 50 messages that match
     const response = await gmail.users.messages.list({
       userId: 'me',
       q: query,
-      maxResults: 10
+      maxResults: 50
     });
 
     const messages = response.data.messages || [];

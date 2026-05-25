@@ -5,6 +5,7 @@ const User = require('../models/User');
 const FoodLog = require('../models/FoodLog');
 const ChatSession = require('../models/ChatSession');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { google } = require('googleapis');
 
 router.post('/chat', auth, async (req, res) => {
   try {
@@ -178,6 +179,16 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
                 goal: { type: "STRING", description: "User's goal (lose, maintain, gain)" }
               }
             }
+          },
+          {
+            name: "syncGmailOrders",
+            description: "Check the user's connected Gmail account to find and save Swiggy/Zomato orders. Call this when the user asks you to check their email, sync their Gmail, or look for a specific order from Swiggy/Zomato in their email.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                specificDateQuery: { type: "STRING", description: "Optional. A specific date string (e.g. '2026/04/30') to search for. Format must be YYYY/MM/DD. If omitted, will search recent emails." }
+              }
+            }
           }
         ]
       }
@@ -254,6 +265,95 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
           user.profile = { ...user.profile, ...updates };
           await user.save();
           replyText = `✅ I have successfully updated your profile with the new information!`;
+        }
+      }
+      else if (call.name === "syncGmailOrders") {
+        const { specificDateQuery } = call.args;
+        if (!user.gmailSyncTokens || !user.gmailSyncTokens.access_token) {
+          replyText = `❌ Your Gmail account is not connected. Please go to the Ledger page and click "Sync Zomato/Swiggy from Gmail" to connect it first!`;
+        } else {
+          try {
+            const client = new google.auth.OAuth2(
+              process.env.GOOGLE_CLIENT_ID,
+              process.env.GOOGLE_CLIENT_SECRET
+            );
+            client.setCredentials(user.gmailSyncTokens);
+            
+            client.on('tokens', async (tokens) => {
+              if (tokens.refresh_token) {
+                user.gmailSyncTokens.refresh_token = tokens.refresh_token;
+              }
+              user.gmailSyncTokens.access_token = tokens.access_token;
+              user.gmailSyncTokens.expiry_date = tokens.expiry_date;
+              await user.save();
+            });
+
+            const gmail = google.gmail({ version: 'v1', auth: client });
+            let baseQuery = '(from:noreply@zomato.com OR from:swiggy@swiggy.in OR from:noreply@swiggy.in) (subject:"Order" OR subject:"Receipt" OR subject:"Summary")';
+            if (specificDateQuery) {
+              baseQuery += ` after:${specificDateQuery.replace(/\//g, '/')} before:${new Date(new Date(specificDateQuery).getTime() + 86400000 * 2).toISOString().split('T')[0].replace(/-/g, '/')}`; // give a 2 day window
+            }
+
+            const response = await gmail.users.messages.list({
+              userId: 'me',
+              q: baseQuery,
+              maxResults: 20
+            });
+
+            const messages = response.data.messages || [];
+            if (messages.length === 0) {
+              replyText = `I checked your Gmail ${specificDateQuery ? 'around ' + specificDateQuery : 'recently'} but couldn't find any Swiggy or Zomato orders.`;
+            } else {
+              let newOrdersCount = 0;
+              for (let msg of messages) {
+                const msgData = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+                let emailText = "";
+                const extractText = (parts) => {
+                  for (let part of parts) {
+                    if (part.mimeType === 'text/plain') emailText += Buffer.from(part.body.data, 'base64').toString('utf-8');
+                    else if (part.parts) extractText(part.parts);
+                  }
+                };
+                if (msgData.data.payload.parts) extractText(msgData.data.payload.parts);
+                else if (msgData.data.payload.body.data) emailText = Buffer.from(msgData.data.payload.body.data, 'base64').toString('utf-8');
+                
+                if (!emailText.trim()) continue;
+
+                const prompt = `You are an expert receipt parser. Extract the food order details from this raw email text. STRICTLY JSON.
+{ "restaurant": "name", "date": "YYYY-MM-DD", "time": "HH:mm", "amount": number, "items": [{ "name": "name", "calories": number }] }
+If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring(0, 4000)}`;
+
+                try {
+                  const aiResult = await model.generateContent(prompt);
+                  const jsonStr = aiResult.response.text().replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+                  const parsed = JSON.parse(jsonStr);
+                  if (parsed.invalid || !parsed.restaurant || !parsed.amount) continue;
+
+                  const existing = await FoodLog.findOne({ user: req.user.id, amount: parsed.amount, restaurant: new RegExp(parsed.restaurant, 'i') });
+                  if (!existing) {
+                    const newLog = new FoodLog({
+                      user: req.user.id,
+                      date: parsed.date ? new Date(parsed.date) : new Date(),
+                      time: parsed.time || "12:00",
+                      mealType: "Dinner",
+                      restaurant: parsed.restaurant,
+                      amount: parsed.amount,
+                      items: parsed.items || [],
+                      notes: "Synced via AI Assistant."
+                    });
+                    await newLog.save();
+                    newOrdersCount++;
+                  }
+                } catch (e) { console.error("AI Assistant Gmail parse error", e.message); }
+              }
+              replyText = newOrdersCount > 0 
+                ? `✅ I found and synced **${newOrdersCount} new orders** from your Gmail!` 
+                : `I checked the matching emails, but those orders were either already synced or didn't contain valid receipt details.`;
+            }
+          } catch (gmailErr) {
+            console.error("Gmail tool error:", gmailErr);
+            replyText = `❌ I encountered an error while trying to read your Gmail: ${gmailErr.message}`;
+          }
         }
       }
     } else {
