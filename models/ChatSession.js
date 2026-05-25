@@ -14,7 +14,7 @@ const ChatSessionSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-ChatSessionSchema.pre('save', function(next) {
+ChatSessionSchema.pre('save', function() {
   this.updatedAt = Date.now();
   if (this.title === 'New Chat' && this.messages.length > 0) {
     const firstMsg = this.messages.find(m => m.role === 'user');
@@ -22,7 +22,6 @@ ChatSessionSchema.pre('save', function(next) {
       this.title = firstMsg.text.substring(0, 30) + (firstMsg.text.length > 30 ? '...' : '');
     }
   }
-  next();
 });
 
 module.exports = mongoose.model('ChatSession', ChatSessionSchema);
