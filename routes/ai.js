@@ -319,7 +319,7 @@ router.post('/scan-receipt', auth, async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
     const prompt = `You are an expert receipt parser. Look at this receipt image and extract the following information.
 You must return the result STRICTLY as a JSON object with no markdown formatting or extra text.
@@ -363,7 +363,7 @@ Ensure the response is ONLY valid JSON.`;
     res.json({ success: true, data: parsedData });
   } catch (err) {
     console.error("Receipt scan error:", err);
-    res.status(500).json({ message: "Failed to process receipt image" });
+    res.status(500).json({ message: "Failed to process receipt image: " + err.message });
   }
 });
 
