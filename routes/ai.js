@@ -319,7 +319,7 @@ router.post('/scan-receipt', auth, async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `You are an expert receipt parser. Look at this receipt image and extract the following information.
 You must return the result STRICTLY as a JSON object with no markdown formatting or extra text.
