@@ -327,6 +327,7 @@ The JSON object must have this exact structure:
 {
   "restaurant": "Name of the restaurant (or empty string if not found)",
   "date": "Date of the receipt in YYYY-MM-DD format (or today's date if not found)",
+  "time": "Time of the receipt in HH:mm 24-hour format (e.g. 14:30) (or empty string if not found)",
   "amount": Total amount paid as a number (e.g. 450),
   "items": [
     {
