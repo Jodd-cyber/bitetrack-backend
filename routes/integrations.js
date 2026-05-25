@@ -42,10 +42,16 @@ router.post('/google/callback', auth, async (req, res) => {
 
     const { tokens } = await tempClient.getToken(code);
     
-    // Save tokens to user
-    await User.findByIdAndUpdate(req.user.id, {
-      gmailSyncTokens: tokens
-    });
+    // Save tokens to user safely
+    const user = await User.findById(req.user.id);
+    user.gmailSyncTokens = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      scope: tokens.scope,
+      token_type: tokens.token_type,
+      expiry_date: tokens.expiry_date
+    };
+    await user.save();
 
     res.json({ success: true, message: "Gmail linked successfully!" });
   } catch (err) {
@@ -70,7 +76,7 @@ router.post('/google/disconnect', auth, async (req, res) => {
 router.post('/sync-emails', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    if (!user.gmailSyncTokens) {
+    if (!user.gmailSyncTokens || !user.gmailSyncTokens.access_token) {
       return res.status(400).json({ message: "Gmail not connected" });
     }
 
