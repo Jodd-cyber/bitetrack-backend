@@ -306,4 +306,65 @@ router.delete('/sessions/:id', auth, async (req, res) => {
   }
 });
 
+// Parse receipt image using Gemini Vision
+router.post('/scan-receipt', auth, async (req, res) => {
+  try {
+    const { imageBase64, mimeType } = req.body;
+    if (!imageBase64 || !mimeType) {
+      return res.status(400).json({ message: "Image and mimeType are required" });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ message: "AI API key not configured" });
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `You are an expert receipt parser. Look at this receipt image and extract the following information.
+You must return the result STRICTLY as a JSON object with no markdown formatting or extra text.
+The JSON object must have this exact structure:
+{
+  "restaurant": "Name of the restaurant (or empty string if not found)",
+  "date": "Date of the receipt in YYYY-MM-DD format (or today's date if not found)",
+  "amount": Total amount paid as a number (e.g. 450),
+  "items": [
+    {
+      "name": "Name of the food item",
+      "calories": Estimated calories for this food item as a number (make your best guess based on the food name)
+    }
+  ]
+}
+
+Ensure the response is ONLY valid JSON.`;
+
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          data: imageBase64,
+          mimeType: mimeType
+        }
+      }
+    ]);
+
+    const responseText = result.response.text().trim();
+    // Clean up potential markdown formatting (e.g., ```json ... ```)
+    const jsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    
+    let parsedData;
+    try {
+      parsedData = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error("Error parsing Gemini JSON response:", responseText);
+      return res.status(500).json({ message: "Failed to parse receipt data. Please try again." });
+    }
+
+    res.json({ success: true, data: parsedData });
+  } catch (err) {
+    console.error("Receipt scan error:", err);
+    res.status(500).json({ message: "Failed to process receipt image" });
+  }
+});
+
 module.exports = router;

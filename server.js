@@ -13,7 +13,7 @@ const app = express();
 app.set("trust proxy", 1); // ✅ MUST BE HERE (top, before routes)
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.use(cors({
   origin: function (origin, callback) {
