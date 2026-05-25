@@ -40,6 +40,7 @@ app.use("/api/user", require("./routes/user"));
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/budget", budgetRoutes);
 app.use("/api/ai", require("./routes/ai"));
+app.use("/api/integrations", require("./routes/integrations"));
 // DB Connection
 async function connectDB() {
   try {
