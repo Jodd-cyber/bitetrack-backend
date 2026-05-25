@@ -3,11 +3,12 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const FoodLog = require('../models/FoodLog');
+const ChatSession = require('../models/ChatSession');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 router.post('/chat', auth, async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, sessionId } = req.body;
     if (!message) {
       return res.status(400).json({ message: "Message is required" });
     }
@@ -59,6 +60,18 @@ router.post('/chat', auth, async (req, res) => {
       formattedLogs = "Error reading recent food logs. Please continue assisting the user without them.";
     }
 
+    let previousContext = "";
+    let chatSession = null;
+    if (sessionId) {
+      chatSession = await ChatSession.findOne({ _id: sessionId, user: req.user.id });
+      if (chatSession) {
+        previousContext = chatSession.messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`).join('\n');
+      }
+    }
+    if (!chatSession) {
+      chatSession = new ChatSession({ user: req.user.id, messages: [] });
+    }
+
     const systemPrompt = `You are an intelligent health and finance assistant named BiteTrack AI. 
 The user is asking you a question about their diet, expenses, or health, OR asking you to perform an action.
 Here is the user's profile:
@@ -73,7 +86,10 @@ Here are the user's food logs for the past 30 days:
 ${formattedLogs}
 Total spent in the last 30 days: ₹${totalSpent}.
 
-User's query: "${message}"
+Previous Conversation History:
+${previousContext || "No previous conversation."}
+
+User's new query: "${message}"
 
 Please provide a helpful, friendly, and concise answer. Do not invent any data.`;
 
@@ -174,6 +190,8 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
     
     // Check if the AI decided to call a function
     const calls = result.response.functionCalls();
+    let replyText = "";
+    
     if (calls && calls.length > 0) {
       const call = calls[0];
       
@@ -193,20 +211,18 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
         });
         await newLog.save();
         const foodNames = items ? items.map(i => i.name).join(', ') : 'your meal';
-        return res.json({ reply: `✅ Successfully logged **${foodNames}** for ${mealType} at ${restaurant} (₹${amount}). I have saved this directly to your database!` });
+        replyText = `✅ Successfully logged **${foodNames}** for ${mealType} at ${restaurant} (₹${amount}). I have saved this directly to your database!`;
       }
-
-      if (call.name === "deleteFoodLog") {
+      else if (call.name === "deleteFoodLog") {
         const { logId } = call.args;
         const deleted = await FoodLog.findOneAndDelete({ _id: logId, user: req.user.id });
         if (deleted) {
-          return res.json({ reply: `🗑️ Successfully deleted the log from ${deleted.date ? new Date(deleted.date).toLocaleDateString() : 'that day'}.` });
+          replyText = `🗑️ Successfully deleted the log from ${deleted.date ? new Date(deleted.date).toLocaleDateString() : 'that day'}.`;
         } else {
-          return res.json({ reply: `❌ I couldn't find a log with that exact ID to delete, or it might have already been removed.` });
+          replyText = `❌ I couldn't find a log with that exact ID to delete, or it might have already been removed.`;
         }
       }
-
-      if (call.name === "editFoodLog") {
+      else if (call.name === "editFoodLog") {
         const { logId, mealType, restaurant, amount, items, notes, time, rating, date } = call.args;
         const updates = {};
         if (mealType !== undefined) updates.mealType = mealType;
@@ -227,28 +243,66 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
         );
 
         if (updated) {
-          return res.json({ reply: `✅ Successfully updated the order.` });
+          replyText = `✅ Successfully updated the order.`;
         } else {
-          return res.json({ reply: `❌ I couldn't find a log with that exact ID to update, or it might have been removed.` });
+          replyText = `❌ I couldn't find a log with that exact ID to update, or it might have been removed.`;
         }
       }
-
-      if (call.name === "updateProfile") {
+      else if (call.name === "updateProfile") {
         const updates = call.args;
         if (Object.keys(updates).length > 0) {
           user.profile = { ...user.profile, ...updates };
           await user.save();
-          return res.json({ reply: `✅ I have successfully updated your profile with the new information!` });
+          replyText = `✅ I have successfully updated your profile with the new information!`;
         }
       }
+    } else {
+      replyText = result.response.text();
     }
 
-    const responseText = result.response.text();
-    res.json({ reply: responseText });
+    chatSession.messages.push({ role: 'user', text: message });
+    chatSession.messages.push({ role: 'assistant', text: replyText });
+    await chatSession.save();
+
+    res.json({ reply: replyText, sessionId: chatSession._id });
 
   } catch (err) {
     console.error("AI Chat Error:", err);
     res.status(500).json({ message: `AI Error: ${err.message}` });
+  }
+});
+
+// Get all chat sessions
+router.get('/sessions', auth, async (req, res) => {
+  try {
+    const sessions = await ChatSession.find({ user: req.user.id })
+      .select('_id title updatedAt')
+      .sort({ updatedAt: -1 });
+    res.json(sessions);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Get specific chat session
+router.get('/sessions/:id', auth, async (req, res) => {
+  try {
+    const session = await ChatSession.findOne({ _id: req.params.id, user: req.user.id });
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Delete specific chat session
+router.delete('/sessions/:id', auth, async (req, res) => {
+  try {
+    const deleted = await ChatSession.findOneAndDelete({ _id: req.params.id, user: req.user.id });
+    if (!deleted) return res.status(404).json({ message: "Session not found" });
+    res.json({ message: "Session deleted" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
