@@ -90,6 +90,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
                 mealType: { type: "STRING", description: "Must be one of: Breakfast, Lunch, Dinner, Snack" },
                 restaurant: { type: "STRING", description: "Name of the restaurant, brand, or 'Home'" },
                 amount: { type: "NUMBER", description: "Total cost or amount spent. Use 0 if unknown or home cooked." },
+                date: { type: "STRING", description: "Date of the meal in YYYY-MM-DD format. Defaults to today if not provided." },
                 time: { type: "STRING", description: "Time of the meal in HH:mm format" },
                 rating: { type: "NUMBER", description: "Rating out of 5 stars (e.g. 4 for 4 stars)" },
                 items: { 
@@ -129,6 +130,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
                 mealType: { type: "STRING", description: "Must be one of: Breakfast, Lunch, Dinner, Snack" },
                 restaurant: { type: "STRING", description: "Name of the restaurant, brand, or 'Home'" },
                 amount: { type: "NUMBER", description: "Total cost or amount spent." },
+                date: { type: "STRING", description: "Date of the meal in YYYY-MM-DD format." },
                 time: { type: "STRING", description: "Time of the meal in HH:mm format" },
                 rating: { type: "NUMBER", description: "Rating out of 5 stars (e.g. 4 for 4 stars)" },
                 items: { 
@@ -176,11 +178,11 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
       const call = calls[0];
       
       if (call.name === "addFoodLog") {
-        const { mealType, restaurant, amount, items, notes, time, rating } = call.args;
+        const { mealType, restaurant, amount, items, notes, time, rating, date } = call.args;
         let cleanNotes = notes ? notes.replace(/rated\s*\d+\s*stars?/gi, '').trim() : "";
         const newLog = new FoodLog({
           user: req.user.id,
-          date: new Date(),
+          date: date ? new Date(date) : new Date(),
           mealType: mealType || 'Snack',
           restaurant: restaurant || 'Unknown',
           amount: amount || 0,
@@ -205,7 +207,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
       }
 
       if (call.name === "editFoodLog") {
-        const { logId, mealType, restaurant, amount, items, notes, time, rating } = call.args;
+        const { logId, mealType, restaurant, amount, items, notes, time, rating, date } = call.args;
         const updates = {};
         if (mealType !== undefined) updates.mealType = mealType;
         if (restaurant !== undefined) updates.restaurant = restaurant;
@@ -216,6 +218,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
         }
         if (time !== undefined) updates.time = time;
         if (rating !== undefined) updates.rating = rating;
+        if (date !== undefined) updates.date = new Date(date);
 
         const updated = await FoodLog.findOneAndUpdate(
           { _id: logId, user: req.user.id },
