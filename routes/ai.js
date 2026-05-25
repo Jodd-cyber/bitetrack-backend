@@ -90,6 +90,8 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
                 mealType: { type: "STRING", description: "Must be one of: Breakfast, Lunch, Dinner, Snack" },
                 restaurant: { type: "STRING", description: "Name of the restaurant, brand, or 'Home'" },
                 amount: { type: "NUMBER", description: "Total cost or amount spent. Use 0 if unknown or home cooked." },
+                time: { type: "STRING", description: "Time of the meal in HH:mm format" },
+                rating: { type: "NUMBER", description: "Rating out of 5 stars (e.g. 4 for 4 stars)" },
                 items: { 
                   type: "ARRAY", 
                   description: "List of food items eaten",
@@ -113,6 +115,34 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
               type: "OBJECT",
               properties: {
                 logId: { type: "STRING", description: "The exact [ID: ...] string of the log to delete" }
+              },
+              required: ["logId"]
+            }
+          },
+          {
+            name: "editFoodLog",
+            description: "Edit/update an existing food log. Call this when the user asks you to modify or change a food log. You MUST use the ID provided in the system prompt logs.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                logId: { type: "STRING", description: "The exact [ID: ...] string of the log to edit" },
+                mealType: { type: "STRING", description: "Must be one of: Breakfast, Lunch, Dinner, Snack" },
+                restaurant: { type: "STRING", description: "Name of the restaurant, brand, or 'Home'" },
+                amount: { type: "NUMBER", description: "Total cost or amount spent." },
+                time: { type: "STRING", description: "Time of the meal in HH:mm format" },
+                rating: { type: "NUMBER", description: "Rating out of 5 stars (e.g. 4 for 4 stars)" },
+                items: { 
+                  type: "ARRAY", 
+                  description: "List of food items eaten",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      name: { type: "STRING", description: "Name of the food item (e.g. Pizza, Salad)" },
+                      quantity: { type: "NUMBER", description: "Quantity of this item" }
+                    }
+                  }
+                },
+                notes: { type: "STRING", description: "Any additional context or notes" }
               },
               required: ["logId"]
             }
@@ -146,7 +176,7 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
       const call = calls[0];
       
       if (call.name === "addFoodLog") {
-        const { mealType, restaurant, amount, items, notes } = call.args;
+        const { mealType, restaurant, amount, items, notes, time, rating } = call.args;
         const newLog = new FoodLog({
           user: req.user.id,
           date: new Date(),
@@ -154,7 +184,9 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
           restaurant: restaurant || 'Unknown',
           amount: amount || 0,
           items: items || [],
-          notes: notes || ""
+          notes: notes || "",
+          time: time || "",
+          rating: rating || 0
         });
         await newLog.save();
         const foodNames = items ? items.map(i => i.name).join(', ') : 'your meal';
@@ -168,6 +200,30 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
           return res.json({ reply: `🗑️ Successfully deleted the log from ${deleted.date ? new Date(deleted.date).toLocaleDateString() : 'that day'}.` });
         } else {
           return res.json({ reply: `❌ I couldn't find a log with that exact ID to delete, or it might have already been removed.` });
+        }
+      }
+
+      if (call.name === "editFoodLog") {
+        const { logId, mealType, restaurant, amount, items, notes, time, rating } = call.args;
+        const updates = {};
+        if (mealType !== undefined) updates.mealType = mealType;
+        if (restaurant !== undefined) updates.restaurant = restaurant;
+        if (amount !== undefined) updates.amount = amount;
+        if (items !== undefined) updates.items = items;
+        if (notes !== undefined) updates.notes = notes;
+        if (time !== undefined) updates.time = time;
+        if (rating !== undefined) updates.rating = rating;
+
+        const updated = await FoodLog.findOneAndUpdate(
+          { _id: logId, user: req.user.id },
+          { $set: updates },
+          { new: true }
+        );
+
+        if (updated) {
+          return res.json({ reply: `✅ Successfully updated the order.` });
+        } else {
+          return res.json({ reply: `❌ I couldn't find a log with that exact ID to update, or it might have been removed.` });
         }
       }
 
