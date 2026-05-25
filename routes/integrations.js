@@ -197,7 +197,7 @@ ${emailText.substring(0, 5000)}
       }
     }
 
-    res.json({ success: true, newOrders: newOrdersCount, message: \`Successfully synced \${newOrdersCount} new orders!\` });
+    res.json({ success: true, newOrders: newOrdersCount, message: `Successfully synced ${newOrdersCount} new orders!` });
   } catch (err) {
     console.error("Email sync error:", err);
     res.status(500).json({ message: "Failed to sync emails" });
