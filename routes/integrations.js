@@ -162,6 +162,11 @@ router.post('/sync-emails', auth, async (req, res) => {
 
       if (!emailText.trim()) continue;
 
+      const emailTimestamp = parseInt(msgData.data.internalDate);
+      const emailDateObj = new Date(emailTimestamp);
+      const emailDateStr = emailDateObj.toISOString().split('T')[0];
+      const emailTimeStr = emailDateObj.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+
       // Use Gemini to extract data
       const prompt = `You are an expert receipt parser. Extract the food order details from this raw email text.
 You must return the result STRICTLY as a JSON object.
@@ -173,6 +178,7 @@ Structure:
   "amount": Total amount paid (number),
   "items": [{ "name": "Item name", "calories": estimated calories (number) }]
 }
+IMPORTANT: This email was received on ${emailDateStr} at ${emailTimeStr}. If the exact order time is not explicitly found in the text, use ${emailTimeStr} as the time and ${emailDateStr} as the date.
 If this email is NOT a valid food order receipt, return { "invalid": true }.
 
 Email Text:
