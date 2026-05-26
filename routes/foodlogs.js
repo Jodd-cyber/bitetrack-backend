@@ -35,15 +35,21 @@ router.post('/', auth, async (req, res) => {
       const user = await User.findById(req.user.id);
       if (user && user.email) {
         const logDate = new Date(req.body.date);
-        const month = logDate.getMonth() + 1;
+        const monthZeroIndexed = logDate.getMonth();
+        const month1Indexed = monthZeroIndexed + 1;
         const year = logDate.getFullYear();
-        const monthString = `${year}-${String(month).padStart(2, '0')}`;
+        const monthString = `${year}-${String(month1Indexed).padStart(2, '0')}`;
 
         if (user.lastBudgetAlertMonth !== monthString) {
-          const budget = await Budget.findOne({ userId: req.user.id, month, year });
+          let budget = await Budget.findOne({ userId: req.user.id, month: monthZeroIndexed, year });
+          
+          if (!budget) {
+            budget = await Budget.findOne({ userId: req.user.id, saveForAllMonths: true }).sort({ createdAt: -1 });
+          }
+
           if (budget) {
-            const startDate = new Date(year, month - 1, 1);
-            const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+            const startDate = new Date(year, monthZeroIndexed, 1);
+            const endDate = new Date(year, monthZeroIndexed + 1, 0, 23, 59, 59, 999);
             const allLogsThisMonth = await FoodLog.find({
               user: req.user.id,
               date: { $gte: startDate, $lte: endDate }
@@ -53,7 +59,7 @@ router.post('/', auth, async (req, res) => {
             if (totalSpent >= budget.amount * 0.7) {
               const html = `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <h2>Budget Alert for ${month}/${year}! 🚨</h2>
+                  <h2>Budget Alert for ${month1Indexed}/${year}! 🚨</h2>
                   <p>Hi ${user.name || 'there'},</p>
                   <p>You have spent <strong>$${totalSpent.toFixed(2)}</strong> this month, which is over 70% of your monthly budget of <strong>$${budget.amount}</strong>.</p>
                   <p>Keep an eye on your expenses!</p>
