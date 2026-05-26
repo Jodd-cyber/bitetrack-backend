@@ -185,65 +185,37 @@ Email Text:
 ${emailText.substring(0, 5000)}
 `;
 
-      let retryCount = 0;
-      let success = false;
+      try {
+        const result = await model.generateContent(prompt);
+        const jsonStr = result.response.text().replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+        
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.invalid || !parsed.restaurant || !parsed.amount) continue;
 
-      while (retryCount < 3 && !success) {
-        try {
-          const result = await model.generateContent(prompt);
-          const jsonStr = result.response.text().replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
-          
-          const parsed = JSON.parse(jsonStr);
-          if (parsed.invalid || !parsed.restaurant || !parsed.amount) {
-            success = true;
-            break;
-          }
+        // Check for duplicate in DB
+        const existing = await FoodLog.findOne({
+          user: req.user.id,
+          amount: parsed.amount,
+          restaurant: new RegExp(parsed.restaurant, 'i')
+        });
 
-          // Check for duplicate in DB
-          const existing = await FoodLog.findOne({
+        // If not a duplicate, save it!
+        if (!existing) {
+          const newLog = new FoodLog({
             user: req.user.id,
+            date: parsed.date ? new Date(parsed.date) : new Date(),
+            time: parsed.time || "12:00",
+            mealType: "Dinner", // Default fallback
+            restaurant: parsed.restaurant,
             amount: parsed.amount,
-            restaurant: new RegExp(parsed.restaurant, 'i')
+            items: parsed.items || [],
+            notes: "Automatically synced from Gmail."
           });
-
-          // If not a duplicate, save it!
-          if (!existing) {
-            const newLog = new FoodLog({
-              user: req.user.id,
-              date: parsed.date ? new Date(parsed.date) : new Date(),
-              time: parsed.time || "12:00",
-              mealType: "Dinner", // Default fallback
-              restaurant: parsed.restaurant,
-              amount: parsed.amount,
-              items: parsed.items || [],
-              notes: "Automatically synced from Gmail."
-            });
-            await newLog.save();
-            newOrdersCount++;
-          }
-          success = true;
-        } catch (aiErr) {
-          if (aiErr.message.includes('429') || aiErr.message.includes('Quota') || aiErr.message.includes('quota')) {
-            let waitTime = 8000; // default 8 seconds
-            
-            // Try to extract exact seconds from Google's error (e.g., "Please retry in 46.078s" or "retryDelay":"46s")
-            const match = aiErr.message.match(/retry in ([\d\.]+)s/);
-            const delayMatch = aiErr.message.match(/"retryDelay":"(\d+)s"/);
-            
-            if (match && match[1]) {
-              waitTime = (parseFloat(match[1]) + 2) * 1000; // Add 2 seconds buffer
-            } else if (delayMatch && delayMatch[1]) {
-              waitTime = (parseInt(delayMatch[1]) + 2) * 1000;
-            }
-
-            console.log(`Rate limit hit. Google requested wait. Pausing for ${Math.round(waitTime/1000)} seconds before retry ${retryCount + 1}...`);
-            await new Promise(r => setTimeout(r, waitTime));
-            retryCount++;
-          } else {
-            console.error("Failed to process email with AI:", aiErr.message);
-            break;
-          }
+          await newLog.save();
+          newOrdersCount++;
         }
+      } catch (aiErr) {
+        console.error("Failed to process email with AI:", aiErr.message);
       }
     }
 
