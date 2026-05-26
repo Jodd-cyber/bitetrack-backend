@@ -224,8 +224,20 @@ ${emailText.substring(0, 5000)}
           success = true;
         } catch (aiErr) {
           if (aiErr.message.includes('429') || aiErr.message.includes('Quota') || aiErr.message.includes('quota')) {
-            console.log(`Rate limit hit (429). Waiting 8 seconds before retry ${retryCount + 1}...`);
-            await new Promise(r => setTimeout(r, 8000));
+            let waitTime = 8000; // default 8 seconds
+            
+            // Try to extract exact seconds from Google's error (e.g., "Please retry in 46.078s" or "retryDelay":"46s")
+            const match = aiErr.message.match(/retry in ([\d\.]+)s/);
+            const delayMatch = aiErr.message.match(/"retryDelay":"(\d+)s"/);
+            
+            if (match && match[1]) {
+              waitTime = (parseFloat(match[1]) + 2) * 1000; // Add 2 seconds buffer
+            } else if (delayMatch && delayMatch[1]) {
+              waitTime = (parseInt(delayMatch[1]) + 2) * 1000;
+            }
+
+            console.log(`Rate limit hit. Google requested wait. Pausing for ${Math.round(waitTime/1000)} seconds before retry ${retryCount + 1}...`);
+            await new Promise(r => setTimeout(r, waitTime));
             retryCount++;
           } else {
             console.error("Failed to process email with AI:", aiErr.message);
