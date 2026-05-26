@@ -21,7 +21,9 @@ const userSchema = new mongoose.Schema(
       token_type: String,
       expiry_date: Number
     },
-    lastEmailSyncDate: Date
+    lastEmailSyncDate: Date,
+    lastBudgetAlertMonth: String,
+    remindersEnabled: { type: Boolean, default: true }
   },
   { timestamps: true }
 );
