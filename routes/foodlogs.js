@@ -28,55 +28,6 @@ router.post('/', auth, async (req, res) => {
 
     res.status(201).json(newLog);
 
-    // START: Budget Check Logic (Run in background)
-    (async () => {
-      try {
-        const User = require('../models/User');
-        const Budget = require('../models/Budget');
-        const { sendEmail } = require('../utils/email');
-        
-        const user = await User.findById(req.user.id);
-        if (user && user.email) {
-          const logDate = new Date(req.body.date);
-          const monthZeroIndexed = logDate.getMonth();
-          const month1Indexed = monthZeroIndexed + 1;
-          const year = logDate.getFullYear();
-
-          let budget = await Budget.findOne({ userId: req.user.id, month: monthZeroIndexed, year });
-          
-          if (!budget) {
-            budget = await Budget.findOne({ userId: req.user.id, saveForAllMonths: true }).sort({ createdAt: -1 });
-          }
-
-          if (budget) {
-            const startDate = new Date(year, monthZeroIndexed, 1);
-            const endDate = new Date(year, monthZeroIndexed + 1, 0, 23, 59, 59, 999);
-            const allLogsThisMonth = await FoodLog.find({
-              user: req.user.id,
-              date: { $gte: startDate, $lte: endDate }
-            });
-            const totalSpent = allLogsThisMonth.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
-            
-            if (totalSpent >= budget.amount * 0.7) {
-              const html = `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <h2>Budget Alert for ${month1Indexed}/${year}! 🚨</h2>
-                  <p>Hi ${user.name || 'there'},</p>
-                  <p>You have spent <strong>$${totalSpent.toFixed(2)}</strong> this month, which is over 70% of your monthly budget of <strong>$${budget.amount}</strong>.</p>
-                  <p>Keep an eye on your expenses!</p>
-                </div>
-              `;
-              await sendEmail(user.email, 'BiteTrack: You are approaching your monthly budget limit', html);
-            }
-          }
-        }
-      } catch (budgetError) {
-        console.error('Error checking budget threshold:', budgetError);
-      }
-    })();
-    // END: Budget Check Logic
-
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

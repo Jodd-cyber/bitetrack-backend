@@ -54,9 +54,6 @@ async function connectDB() {
 
 connectDB();
 
-// Initialize cron jobs
-require('./utils/cron');
-
 // Start server
 const PORT = process.env.PORT || 5000;
 
