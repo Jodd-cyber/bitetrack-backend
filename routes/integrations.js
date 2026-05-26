@@ -185,37 +185,53 @@ Email Text:
 ${emailText.substring(0, 5000)}
 `;
 
-      try {
-        const result = await model.generateContent(prompt);
-        const jsonStr = result.response.text().replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
-        
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.invalid || !parsed.restaurant || !parsed.amount) continue;
+      let retryCount = 0;
+      let success = false;
 
-        // Check for duplicate in DB
-        const existing = await FoodLog.findOne({
-          user: req.user.id,
-          amount: parsed.amount,
-          restaurant: new RegExp(parsed.restaurant, 'i')
-        });
+      while (retryCount < 3 && !success) {
+        try {
+          const result = await model.generateContent(prompt);
+          const jsonStr = result.response.text().replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+          
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.invalid || !parsed.restaurant || !parsed.amount) {
+            success = true;
+            break;
+          }
 
-        // If not a duplicate, save it!
-        if (!existing) {
-          const newLog = new FoodLog({
+          // Check for duplicate in DB
+          const existing = await FoodLog.findOne({
             user: req.user.id,
-            date: parsed.date ? new Date(parsed.date) : new Date(),
-            time: parsed.time || "12:00",
-            mealType: "Dinner", // Default fallback
-            restaurant: parsed.restaurant,
             amount: parsed.amount,
-            items: parsed.items || [],
-            notes: "Automatically synced from Gmail."
+            restaurant: new RegExp(parsed.restaurant, 'i')
           });
-          await newLog.save();
-          newOrdersCount++;
+
+          // If not a duplicate, save it!
+          if (!existing) {
+            const newLog = new FoodLog({
+              user: req.user.id,
+              date: parsed.date ? new Date(parsed.date) : new Date(),
+              time: parsed.time || "12:00",
+              mealType: "Dinner", // Default fallback
+              restaurant: parsed.restaurant,
+              amount: parsed.amount,
+              items: parsed.items || [],
+              notes: "Automatically synced from Gmail."
+            });
+            await newLog.save();
+            newOrdersCount++;
+          }
+          success = true;
+        } catch (aiErr) {
+          if (aiErr.message.includes('429') || aiErr.message.includes('Quota') || aiErr.message.includes('quota')) {
+            console.log(`Rate limit hit (429). Waiting 8 seconds before retry ${retryCount + 1}...`);
+            await new Promise(r => setTimeout(r, 8000));
+            retryCount++;
+          } else {
+            console.error("Failed to process email with AI:", aiErr.message);
+            break;
+          }
         }
-      } catch (aiErr) {
-        console.error("Failed to process email with AI:", aiErr.message);
       }
     }
 
