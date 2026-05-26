@@ -26,56 +26,67 @@ router.post('/', auth, async (req, res) => {
 
     await newLog.save();
 
-    res.status(201).json(newLog);
+    let emailSent = false;
+    let debugInfo = "Not executed";
 
-    // START: Budget Check Logic (Run in background)
-    (async () => {
-      try {
-        const User = require('../models/User');
-        const Budget = require('../models/Budget');
-        const { sendEmail } = require('../utils/email');
+    // START: Budget Check Logic (Synchronous for reliability)
+    try {
+      const User = require('../models/User');
+      const Budget = require('../models/Budget');
+      const { sendEmail } = require('../utils/email');
+      
+      const user = await User.findById(req.user.id);
+      if (user && user.email) {
+        const logDate = new Date(req.body.date);
+        const monthZeroIndexed = logDate.getMonth();
+        const month1Indexed = monthZeroIndexed + 1;
+        const year = logDate.getFullYear();
+
+        let budget = await Budget.findOne({ userId: req.user.id, month: monthZeroIndexed, year });
         
-        const user = await User.findById(req.user.id);
-        if (user && user.email) {
-          const logDate = new Date(req.body.date);
-          const monthZeroIndexed = logDate.getMonth();
-          const month1Indexed = monthZeroIndexed + 1;
-          const year = logDate.getFullYear();
-          const monthString = `${year}-${String(month1Indexed).padStart(2, '0')}`;
-
-          let budget = await Budget.findOne({ userId: req.user.id, month: monthZeroIndexed, year });
-          
-          if (!budget) {
-            budget = await Budget.findOne({ userId: req.user.id, saveForAllMonths: true }).sort({ createdAt: -1 });
-          }
-
-          if (budget) {
-            const startDate = new Date(year, monthZeroIndexed, 1);
-            const endDate = new Date(year, monthZeroIndexed + 1, 0, 23, 59, 59, 999);
-            const allLogsThisMonth = await FoodLog.find({
-              user: req.user.id,
-              date: { $gte: startDate, $lte: endDate }
-            });
-            const totalSpent = allLogsThisMonth.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
-            
-            if (totalSpent >= budget.amount * 0.7) {
-              const html = `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                  <h2>Budget Alert for ${month1Indexed}/${year}! 🚨</h2>
-                  <p>Hi ${user.name || 'there'},</p>
-                  <p>You have spent <strong>$${totalSpent.toFixed(2)}</strong> this month, which is over 70% of your monthly budget of <strong>$${budget.amount}</strong>.</p>
-                  <p>Keep an eye on your expenses!</p>
-                </div>
-              `;
-              await sendEmail(user.email, 'BiteTrack: You are approaching your monthly budget limit', html);
-            }
-          }
+        if (!budget) {
+          budget = await Budget.findOne({ userId: req.user.id, saveForAllMonths: true }).sort({ createdAt: -1 });
         }
-      } catch (budgetError) {
-        console.error('Error checking budget threshold:', budgetError);
+
+        if (budget) {
+          const startDate = new Date(year, monthZeroIndexed, 1);
+          const endDate = new Date(year, monthZeroIndexed + 1, 0, 23, 59, 59, 999);
+          const allLogsThisMonth = await FoodLog.find({
+            user: req.user.id,
+            date: { $gte: startDate, $lte: endDate }
+          });
+          const totalSpent = allLogsThisMonth.reduce((acc, log) => acc + (Number(log.amount) || 0), 0);
+          
+          debugInfo = `Spent: ${totalSpent}, Budget: ${budget.amount}`;
+
+          if (totalSpent >= budget.amount * 0.7) {
+            const html = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2>Budget Alert for ${month1Indexed}/${year}! 🚨</h2>
+                <p>Hi ${user.name || 'there'},</p>
+                <p>You have spent <strong>$${totalSpent.toFixed(2)}</strong> this month, which is over 70% of your monthly budget of <strong>$${budget.amount}</strong>.</p>
+                <p>Keep an eye on your expenses!</p>
+              </div>
+            `;
+            const success = await sendEmail(user.email, 'BiteTrack: You are approaching your monthly budget limit', html);
+            emailSent = success;
+            debugInfo += ` | trigger: true, success: ${success}`;
+          } else {
+            debugInfo += ` | Not over 70%`;
+          }
+        } else {
+          debugInfo = "No budget found for user";
+        }
+      } else {
+        debugInfo = "User or email not found";
       }
-    })();
+    } catch (budgetError) {
+      console.error('Error checking budget threshold:', budgetError);
+      debugInfo = "Error: " + budgetError.message;
+    }
     // END: Budget Check Logic
+
+    res.status(201).json({ log: newLog, emailSent, debugInfo });
 
 
   } catch (err) {
