@@ -224,6 +224,19 @@ ${emailText.substring(0, 5000)}
     res.json({ success: true, newOrders: newOrdersCount, message: `Successfully synced ${newOrdersCount} new orders!` });
   } catch (err) {
     console.error("Email sync error:", err);
+    
+    // Handle expired or revoked Google tokens
+    if (err.message && err.message.includes('invalid_grant')) {
+      try {
+        await User.findByIdAndUpdate(req.user.id, {
+          $unset: { gmailSyncTokens: 1, lastEmailSyncDate: 1 }
+        });
+      } catch (dbErr) {
+        console.error("Failed to unset expired tokens:", dbErr);
+      }
+      return res.status(400).json({ message: "Gmail not connected" });
+    }
+
     res.status(500).json({ message: "Failed to sync emails: " + err.message });
   }
 });
