@@ -35,7 +35,7 @@ router.get('/profile', auth, async (req, res) => {
 // Update user profile
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { age, height, weight, gender, goal } = req.body;
+    const { age, height, weight, gender, goal, avatar } = req.body;
     const user = await User.findById(req.user.id);
     
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -46,7 +46,8 @@ router.put('/profile', auth, async (req, res) => {
       ...(height && { height }),
       ...(weight && { weight }),
       ...(gender && { gender }),
-      ...(goal && { goal })
+      ...(goal && { goal }),
+      ...(avatar !== undefined && { avatar })
     };
 
     await user.save();

@@ -4,6 +4,7 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const FoodLog = require('../models/FoodLog');
 const ChatSession = require('../models/ChatSession');
+const Budget = require('../models/Budget');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { google } = require('googleapis');
 
@@ -486,6 +487,135 @@ Ensure the response is ONLY valid JSON.`;
   } catch (err) {
     console.error("Receipt scan error:", err);
     res.status(500).json({ message: "Failed to process receipt image: " + err.message });
+  }
+});
+
+// GET /api/ai/insights
+router.get('/insights', auth, async (req, res) => {
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ message: "AI API key not configured" });
+    }
+
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const forceRefresh = req.query.force === 'true';
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    const now = new Date();
+
+    if (
+      !forceRefresh &&
+      user.profile &&
+      user.profile.aiInsights &&
+      user.profile.aiInsightsUpdatedAt &&
+      (now - new Date(user.profile.aiInsightsUpdatedAt) < SIX_HOURS_MS)
+    ) {
+      return res.json({
+        success: true,
+        insight: user.profile.aiInsights,
+        updatedAt: user.profile.aiInsightsUpdatedAt,
+        cached: true
+      });
+    }
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const logs = await FoodLog.find({
+      user: req.user.id,
+      date: { $gte: thirtyDaysAgo }
+    }).sort({ date: 1 });
+
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    let budgetObj = await Budget.findOne({ userId: req.user.id, month: currentMonth, year: currentYear });
+    if (!budgetObj) {
+      budgetObj = await Budget.findOne({ userId: req.user.id, saveForAllMonths: true }).sort({ createdAt: -1 });
+    }
+    const budgetAmount = budgetObj ? budgetObj.amount : 0;
+
+    const startOfMonth = new Date(currentYear, currentMonth, 1);
+    const currentMonthLogs = logs.filter(log => {
+      const logDate = new Date(log.date);
+      return logDate >= startOfMonth;
+    });
+    const spentThisMonth = currentMonthLogs.reduce((sum, log) => sum + (log.amount || 0), 0);
+    const totalSpent30Days = logs.reduce((sum, log) => sum + (log.amount || 0), 0);
+
+    let logsSummary = '';
+    if (logs.length > 0) {
+      const restaurantCounts = {};
+      const mealCounts = { Breakfast: 0, Lunch: 0, Dinner: 0, Snack: 0, Snacks: 0 };
+      logs.forEach(log => {
+        const rest = log.restaurant || 'Home Cooked / Unknown';
+        restaurantCounts[rest] = (restaurantCounts[rest] || 0) + 1;
+        const meal = log.mealType || 'Unknown';
+        if (mealCounts[meal] !== undefined) {
+          mealCounts[meal]++;
+        }
+      });
+      
+      logsSummary = `In the last 30 days, you logged ${logs.length} meals.
+- Spent: ₹${totalSpent30Days} in total.
+- Restaurants/Sources: ${Object.entries(restaurantCounts).map(([k, v]) => `${k} (${v} times)`).join(', ')}.
+- Meals split: Breakfast (${mealCounts.Breakfast}), Lunch (${mealCounts.Lunch}), Dinner (${mealCounts.Dinner}), Snacks/Snack (${mealCounts.Snack + mealCounts.Snacks}).`;
+    } else {
+      logsSummary = 'No food logs recorded in the last 30 days.';
+    }
+
+    const profile = user.profile || {};
+    const gender = profile.gender || 'Unknown';
+    const age = profile.age || 'Unknown';
+    const weight = profile.weight || 'Unknown';
+    const height = profile.height || 'Unknown';
+    const goal = profile.goal || 'Unknown';
+
+    const prompt = `You are BiteTrack AI, a health and personal finance budget assistant.
+Analyze the user's food logs and spending habits.
+Here is the user profile:
+- Age: ${age}
+- Height: ${height} cm
+- Weight: ${weight} kg
+- Gender: ${gender}
+- Goal: ${goal}
+
+Current month budget status:
+- Budget limit: ₹${budgetAmount}
+- Spent so far: ₹${spentThisMonth}
+- Remaining budget: ₹${budgetAmount - spentThisMonth}
+
+30-day food logging summary:
+${logsSummary}
+
+Generate a single, highly personalized AI insight for this user.
+Requirements:
+1. Provide practical, clear, actionable advice combining health (e.g. weight loss / maintain, meal variety) and budget (e.g. eating out too much, saving tips).
+2. It MUST be extremely concise: maximum 2 to 3 sentences (under 220 characters). It must fit inside a small card component on a mobile dashboard.
+3. Use a friendly, encouraging, and slightly witty/humorous tone. Don't use markdown headers or lists, just plain text. Do not invent any new numbers or fake stats. Do not include introductory text like "Here is your insight:".
+4. If they have no logs, encourage them to start logging their meals to get personalized insights.`;
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const result = await model.generateContent(prompt);
+    const insightText = result.response.text().trim();
+
+    user.profile.aiInsights = insightText;
+    user.profile.aiInsightsUpdatedAt = now;
+    await user.save();
+
+    res.json({
+      success: true,
+      insight: insightText,
+      updatedAt: now,
+      cached: false
+    });
+
+  } catch (err) {
+    console.error("AI Insights Endpoint Error:", err);
+    res.status(500).json({ message: `AI Insights Error: ${err.message}` });
   }
 });
 

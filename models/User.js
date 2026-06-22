@@ -12,7 +12,10 @@ const userSchema = new mongoose.Schema(
       height: { type: Number }, // in cm
       weight: { type: Number }, // in kg
       gender: { type: String, enum: ['male', 'female', 'other', ''] },
-      goal: { type: String, enum: ['lose', 'maintain', 'gain', ''] }
+      goal: { type: String, enum: ['lose', 'maintain', 'gain', ''] },
+      avatar: { type: String },
+      aiInsights: { type: String },
+      aiInsightsUpdatedAt: { type: Date }
     },
     gmailSyncTokens: {
       access_token: String,
