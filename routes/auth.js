@@ -224,25 +224,31 @@ router.post("/reset-password/:token", async (req, res) => {
   });
 });
 
-const redirectToSignin = (res, error) => {
+const redirectToSignin = (res, error, state) => {
+  if (state && (state.startsWith("bitetrack://") || state.startsWith("exp://"))) {
+    return res.redirect(`${state}?error=${error}`);
+  }
   return res.redirect(`${FRONTEND_URL}/signin?error=${error}`);
 };
 
 const completeOAuthLogin = async (req, res, providerName) => {
   try {
     const user = req.user;
-    console.log(`✅ ${providerName}: User received`); // ✅ ADD THIS
+    console.log(`✅ ${providerName}: User received`);
     
+    const state = req.query.state;
+    console.log(`🔍 completeOAuthLogin: state = ${state}`);
+
     if (!user) {
       console.error(`❌ ${providerName} OAuth completed without a user`);
-      return redirectToSignin(res, `${providerName.toLowerCase()}_no_user`);
+      return redirectToSignin(res, `${providerName.toLowerCase()}_no_user`, state);
     }
 
-    console.log(`✅ ${providerName}: User fields - id:${!!user._id}, name:${!!user.name}, email:${!!user.email}`); // ✅ ADD THIS
+    console.log(`✅ ${providerName}: User fields - id:${!!user._id}, name:${!!user.name}, email:${!!user.email}`);
     
     if (!user._id || !user.name || !user.email) {
       console.error(`❌ ${providerName} OAuth user is missing required fields`, user);
-      return redirectToSignin(res, `${providerName.toLowerCase()}_invalid_user`);
+      return redirectToSignin(res, `${providerName.toLowerCase()}_invalid_user`, state);
     }
 
     const token = jwt.sign(
@@ -256,46 +262,55 @@ const completeOAuthLogin = async (req, res, providerName) => {
     );
 
     console.log(`✅ ${providerName}: JWT generated`);
-    const redirectUrl = `${FRONTEND_URL}/oauth-success?token=${encodeURIComponent(token)}&name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user._id)}`;
+    
+    let redirectUrl;
+    if (state && (state.startsWith("bitetrack://") || state.startsWith("exp://"))) {
+      redirectUrl = `${state}?token=${encodeURIComponent(token)}&name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user._id)}`;
+    } else {
+      redirectUrl = `${FRONTEND_URL}/oauth-success?token=${encodeURIComponent(token)}&name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}&userId=${encodeURIComponent(user._id)}`;
+    }
+
     console.log(`📍 ${providerName}: Redirecting to: ${redirectUrl}`);
     console.log(`🎯 FRONTEND_URL used: ${FRONTEND_URL}`);
 
     return res.redirect(redirectUrl);
   } catch (err) {
     console.error(`❌ ${providerName} OAuth token generation failed:`, err);
-    return redirectToSignin(res, `${providerName.toLowerCase()}_token_failed`);
+    return redirectToSignin(res, `${providerName.toLowerCase()}_token_failed`, req.query.state);
   }
 };
 
 router.get(
   "/google",
-  passport.authenticate("google", {
-    scope: ["profile", "email"],
-    session: false,
-  })
+  (req, res, next) => {
+    const state = req.query.state || "";
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+      session: false,
+      state: state
+    })(req, res, next);
+  }
 );
 
 router.get(
   "/google/callback",
   (req, res, next) => {
-    // Log incoming query params so we can inspect the authorization code / redirect details
     console.log('🔍 Google callback query:', req.query);
+    const state = req.query.state || "";
 
     passport.authenticate("google", { session: false }, (err, user, info) => {
       if (err) {
-        // Log full error including non-enumerable properties returned by the OAuth library
         console.error("❌ Google OAuth error (detailed):", util.inspect(err, { showHidden: true, depth: 5 }));
         console.error("❌ Google OAuth info:", util.inspect(info, { showHidden: true, depth: 5 }));
-        // If Google specifically returned invalid_grant (bad/expired/used code or redirect mismatch), surface that
         if (err && err.code === 'invalid_grant') {
-          return redirectToSignin(res, "google_invalid_grant");
+          return redirectToSignin(res, "google_invalid_grant", state);
         }
-        return redirectToSignin(res, "google_auth_failed");
+        return redirectToSignin(res, "google_auth_failed", state);
       }
 
       if (!user) {
         console.error("❌ Google OAuth returned no user:", util.inspect(info, { showHidden: true, depth: 5 }));
-        return redirectToSignin(res, "google_no_user");
+        return redirectToSignin(res, "google_no_user", state);
       }
 
       req.user = user;
@@ -307,32 +322,35 @@ router.get(
 
 router.get(
   "/github",
-  passport.authenticate("github", {
-    scope: ["user:email"],
-    session: false,
-  })
+  (req, res, next) => {
+    const state = req.query.state || "";
+    passport.authenticate("github", {
+      scope: ["user:email"],
+      session: false,
+      state: state
+    })(req, res, next);
+  }
 );
-
-
 
 router.get(
   "/github/callback",
   (req, res, next) => {
     console.log('🔍 GitHub callback query:', req.query);
+    const state = req.query.state || "";
 
     passport.authenticate("github", { session: false }, (err, user, info) => {
       if (err) {
         console.error("❌ GitHub OAuth error (detailed):", util.inspect(err, { showHidden: true, depth: 5 }));
         console.error("❌ GitHub OAuth info:", util.inspect(info, { showHidden: true, depth: 5 }));
         if (err && err.code === 'invalid_grant') {
-          return redirectToSignin(res, "github_invalid_grant");
+          return redirectToSignin(res, "github_invalid_grant", state);
         }
-        return redirectToSignin(res, "github_auth_failed");
+        return redirectToSignin(res, "github_auth_failed", state);
       }
 
       if (!user) {
         console.error("❌ GitHub OAuth returned no user:", util.inspect(info, { showHidden: true, depth: 5 }));
-        return redirectToSignin(res, "github_no_user");
+        return redirectToSignin(res, "github_no_user", state);
       }
 
       req.user = user;

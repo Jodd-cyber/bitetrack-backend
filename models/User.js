@@ -24,7 +24,8 @@ const userSchema = new mongoose.Schema(
       token_type: String,
       expiry_date: Number
     },
-    lastEmailSyncDate: Date
+    lastEmailSyncDate: Date,
+    pushToken: { type: String, default: "" }
   },
   { timestamps: true }
 );
