@@ -64,7 +64,7 @@ router.post("/join", protect, async (req, res) => {
     }
 
     // Check if user is already a member
-    if (group.members.includes(req.user.id)) {
+    if (group.members.some(m => m.toString() === req.user.id.toString())) {
       return res.json({ success: true, message: "Already a member", data: group });
     }
 
@@ -106,8 +106,8 @@ async function calculateGroupBalances(groupId, members) {
     });
   });
 
-  // Find all settlements
-  const settlements = await Settlement.find({ groupId });
+  // Find all completed settlements
+  const settlements = await Settlement.find({ groupId, status: 'completed' });
   settlements.forEach(setl => {
     const fromUser = setl.fromUser.toString();
     const toUser = setl.toUser.toString();
@@ -237,6 +237,7 @@ router.get("/:id", protect, async (req, res) => {
           name: group.name,
           inviteCode: group.inviteCode,
           members: group.members,
+          createdBy: group.createdBy,
           createdAt: group.createdAt
         },
         logs,
@@ -267,7 +268,9 @@ router.post("/:id/settlements", protect, async (req, res) => {
       return res.status(404).json({ message: "Group not found" });
     }
 
-    if (!group.members.includes(req.user.id) || !group.members.includes(toUser)) {
+    const isFromMember = group.members.some(m => m.toString() === req.user.id.toString());
+    const isToMember = group.members.some(m => m.toString() === toUser.toString());
+    if (!isFromMember || !isToMember) {
       return res.status(403).json({ message: "Users must be members of the group" });
     }
 
@@ -276,9 +279,128 @@ router.post("/:id/settlements", protect, async (req, res) => {
       fromUser: req.user.id,
       toUser,
       amount: Number(amount),
+      status: 'pending', // Set status to pending initially
     });
 
     res.status(201).json({ success: true, data: settlement });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// 6. LEAVE/EXIT GROUP
+router.post("/:id/leave", protect, async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    if (!group.members.some(m => m.toString() === req.user.id.toString())) {
+      return res.status(400).json({ message: "You are not a member of this group" });
+    }
+
+    // Remove user from group members
+    group.members = group.members.filter(m => m.toString() !== req.user.id.toString());
+    await group.save();
+
+    res.json({ success: true, message: "Left group successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// 7. DELETE GROUP (Only creator can delete)
+router.delete("/:id", protect, async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    if (group.createdBy.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ message: "Only the group creator can delete this group" });
+    }
+
+    // Delete the group
+    await Group.findByIdAndDelete(req.params.id);
+    // Delete settlements associated with this group
+    await Settlement.deleteMany({ groupId: group._id });
+
+    res.json({ success: true, message: "Group deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// 8. DELETE SETTLEMENT IN A GROUP
+router.delete("/:groupId/settlements/:settlementId", protect, async (req, res) => {
+  try {
+    const { groupId, settlementId } = req.params;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    if (!group.members.includes(req.user.id)) {
+      return res.status(403).json({ message: "Not authorized to access this group" });
+    }
+
+    const settlement = await Settlement.findById(settlementId);
+    if (!settlement) {
+      return res.status(404).json({ message: "Settlement transaction not found" });
+    }
+
+    // Allow sender, recipient or group creator to delete
+    const isPayer = settlement.fromUser.toString() === req.user.id.toString();
+    const isRecipient = settlement.toUser.toString() === req.user.id.toString();
+    const isCreator = group.createdBy.toString() === req.user.id.toString();
+
+    if (!isPayer && !isRecipient && !isCreator) {
+      return res.status(403).json({ message: "Only the participants or group creator can delete this settlement" });
+    }
+
+    await Settlement.findByIdAndDelete(settlementId);
+
+    res.json({ success: true, message: "Settlement transaction deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// 9. ACCEPT SETTLEMENT IN A GROUP (Only recipient can accept)
+router.post("/:groupId/settlements/:settlementId/accept", protect, async (req, res) => {
+  try {
+    const { groupId, settlementId } = req.params;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    if (!group.members.some(m => m.toString() === req.user.id.toString())) {
+      return res.status(403).json({ message: "Not authorized to access this group" });
+    }
+
+    const settlement = await Settlement.findById(settlementId);
+    if (!settlement) {
+      return res.status(404).json({ message: "Settlement transaction not found" });
+    }
+
+    // Only the recipient (toUser) can approve the settlement
+    if (settlement.toUser.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ message: "Only the recipient can accept this settlement" });
+    }
+
+    settlement.status = "completed";
+    await settlement.save();
+
+    res.json({ success: true, message: "Settlement transaction marked as completed", data: settlement });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
