@@ -56,7 +56,7 @@ router.post("/signup", async (req, res) => {
         email: user.email
       },
       process.env.JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '90d' }
     );
 
     return res.status(201).json({
@@ -105,7 +105,7 @@ router.post("/login", async (req, res) => {
         email: user.email
       },
       process.env.JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '90d' }
     );
 
     res.json({
@@ -258,7 +258,7 @@ const completeOAuthLogin = async (req, res, providerName) => {
         email: user.email,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" }
+      { expiresIn: "90d" }
     );
 
     console.log(`✅ ${providerName}: JWT generated`);
