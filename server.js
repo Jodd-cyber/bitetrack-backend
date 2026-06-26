@@ -45,6 +45,7 @@ app.use("/api/feedback", feedbackRoutes);
 app.use("/api/budget", budgetRoutes);
 app.use("/api/ai", require("./routes/ai"));
 app.use("/api/integrations", require("./routes/integrations"));
+app.use("/api/groups", require("./routes/groups"));
 // DB Connection
 async function connectDB() {
   try {

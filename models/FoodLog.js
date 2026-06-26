@@ -17,6 +17,17 @@ const FoodLogSchema = new mongoose.Schema({
   time: { type: String },
   rating: { type: Number, default: 0 },
   images: { type: [String], default: [] },
+  splitInfo: {
+    isSplit: { type: Boolean, default: false },
+    groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', default: null },
+    paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    splitMethod: { type: String, default: 'equal' }, // 'equal', 'unequal'
+    shares: [{
+      user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      amount: { type: Number },
+      settled: { type: Boolean, default: false }
+    }]
+  },
 
   createdAt: { type: Date, default: Date.now }
 });

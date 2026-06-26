@@ -22,7 +22,8 @@ router.post('/', auth, async (req, res) => {
       date: req.body.date,
       time: req.body.time || "",
       rating: Number(req.body.rating) || 0,
-      images: req.body.images || []
+      images: req.body.images || [],
+      splitInfo: req.body.splitInfo || undefined
     });
 
     await newLog.save();
@@ -102,6 +103,9 @@ router.put('/:id', auth, async (req, res) => {
     log.time = req.body.time || "";
     log.rating = Number(req.body.rating) || 0;
     log.images = req.body.images || [];
+    if (req.body.splitInfo) {
+      log.splitInfo = req.body.splitInfo;
+    }
 
     await log.save();
 
