@@ -16,6 +16,7 @@ const FoodLogSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   time: { type: String },
   rating: { type: Number, default: 0 },
+  images: { type: [String], default: [] },
 
   createdAt: { type: Date, default: Date.now }
 });

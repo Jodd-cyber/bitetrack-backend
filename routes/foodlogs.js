@@ -21,7 +21,8 @@ router.post('/', auth, async (req, res) => {
       mealType: req.body.mealType || "Lunch",
       date: req.body.date,
       time: req.body.time || "",
-      rating: Number(req.body.rating) || 0
+      rating: Number(req.body.rating) || 0,
+      images: req.body.images || []
     });
 
     await newLog.save();
@@ -100,6 +101,7 @@ router.put('/:id', auth, async (req, res) => {
     log.date = req.body.date;
     log.time = req.body.time || "";
     log.rating = Number(req.body.rating) || 0;
+    log.images = req.body.images || [];
 
     await log.save();
 

@@ -34,6 +34,10 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", service: "bitetrack-backend" });
 });
 
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", service: "bitetrack-backend" });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/foodlogs", foodlogRoutes);
 app.use("/api/user", require("./routes/user"));
