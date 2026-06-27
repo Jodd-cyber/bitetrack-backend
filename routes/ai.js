@@ -10,7 +10,7 @@ const { google } = require('googleapis');
 
 router.post('/chat', auth, async (req, res) => {
   try {
-    const { message, sessionId } = req.body;
+    const { message, sessionId, fileBase64, mimeType } = req.body;
     if (!message) {
       return res.status(400).json({ message: "Message is required" });
     }
@@ -94,9 +94,9 @@ ${previousContext || "No previous conversation."}
 User's new query: "${message}"
 
 INSTRUCTIONS FOR DIET PLANS & HEALTH:
-- If the user asks you to create, generate, make, or update a diet plan, meal plan, or diet chart, you MUST generate a realistic, healthy, and complete daily plan (including Breakfast, Lunch, Dinner, and optionally Snack) on your own based on their health profile and goals.
-- Estimate realistic calorie counts for each generated meal.
-- Immediately call the 'saveDietPlan' tool under the hood to save it to their profile.
+- If the user asks you to create, generate, make, or update a diet plan, or if they upload a photo, document, PDF, or paste text containing a diet chart/plan (either for a single day or a 7-day week), you MUST read it, parse it, extract the meals and estimated calories day-by-day, and save it.
+- If it is a 7-day weekly schedule, extract meals for each day (Monday to Sunday) and call 'saveDietPlan' with isWeekly=true and the weekly data.
+- If it is a single-day plan, call 'saveDietPlan' with isWeekly=false and the daily data.
 - You are fully authorized to generate food recipes and meal recommendations; do not ask the user what to put, generate it for them!
 - For health queries, give complete, helpful, and science-backed nutritional advice. Do not say you cannot answer.
 
@@ -200,20 +200,104 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
           },
           {
             name: "saveDietPlan",
-            description: "Save a structured daily diet plan for the user. Call this when the user asks you to create, save, or update their diet plan, meal plan, or diet chart.",
+            description: "Save a structured daily or weekly diet plan. Call this when the user asks you to create, save, or update their diet plan, meal plan, or diet chart (either a single-day plan or a 7-day weekly plan).",
             parameters: {
               type: "OBJECT",
               properties: {
-                breakfastName: { type: "STRING", description: "Breakfast food name and details" },
-                breakfastCalories: { type: "NUMBER", description: "Estimated calories for breakfast" },
-                lunchName: { type: "STRING", description: "Lunch food name and details" },
-                lunchCalories: { type: "NUMBER", description: "Estimated calories for lunch" },
-                dinnerName: { type: "STRING", description: "Dinner food name and details" },
-                dinnerCalories: { type: "NUMBER", description: "Estimated calories for dinner" },
-                snackName: { type: "STRING", description: "Snack food name and details" },
-                snackCalories: { type: "NUMBER", description: "Estimated calories for snack" }
+                isWeekly: { type: "BOOLEAN", description: "Set to true if this is a 7-day weekly plan, false if it's a single daily plan." },
+                daily: {
+                  type: "OBJECT",
+                  description: "Single daily diet plan (use if isWeekly is false)",
+                  properties: {
+                    breakfast: {
+                      type: "OBJECT",
+                      properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } }
+                    },
+                    lunch: {
+                      type: "OBJECT",
+                      properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } }
+                    },
+                    dinner: {
+                      type: "OBJECT",
+                      properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } }
+                    },
+                    snack: {
+                      type: "OBJECT",
+                      properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } }
+                    }
+                  }
+                },
+                weekly: {
+                  type: "OBJECT",
+                  description: "7-day weekly diet plan (use if isWeekly is true)",
+                  properties: {
+                    monday: {
+                      type: "OBJECT",
+                      properties: {
+                        breakfast: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        lunch: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        dinner: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        snack: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } }
+                      }
+                    },
+                    tuesday: {
+                      type: "OBJECT",
+                      properties: {
+                        breakfast: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        lunch: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        dinner: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        snack: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } }
+                      }
+                    },
+                    wednesday: {
+                      type: "OBJECT",
+                      properties: {
+                        breakfast: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        lunch: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        dinner: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        snack: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } }
+                      }
+                    },
+                    thursday: {
+                      type: "OBJECT",
+                      properties: {
+                        breakfast: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        lunch: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        dinner: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        snack: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } }
+                      }
+                    },
+                    friday: {
+                      type: "OBJECT",
+                      properties: {
+                        breakfast: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        lunch: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        dinner: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        snack: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } }
+                      }
+                    },
+                    saturday: {
+                      type: "OBJECT",
+                      properties: {
+                        breakfast: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        lunch: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        dinner: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        snack: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } }
+                      }
+                    },
+                    sunday: {
+                      type: "OBJECT",
+                      properties: {
+                        breakfast: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        lunch: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        dinner: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } },
+                        snack: { type: "OBJECT", properties: { name: { type: "STRING" }, calories: { type: "NUMBER" } } }
+                      }
+                    }
+                  }
+                }
               },
-              required: ["breakfastName", "breakfastCalories", "lunchName", "lunchCalories", "dinnerName", "dinnerCalories"]
+              required: ["isWeekly"]
             }
           }
         ]
@@ -223,7 +307,22 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", tools: tools });
 
-    const result = await model.generateContent(systemPrompt);
+    let contentInput;
+    if (fileBase64 && mimeType) {
+      contentInput = [
+        systemPrompt,
+        {
+          inlineData: {
+            data: fileBase64,
+            mimeType: mimeType
+          }
+        }
+      ];
+    } else {
+      contentInput = systemPrompt;
+    }
+
+    const result = await model.generateContent(contentInput);
     
     // Check if the AI decided to call a function
     const calls = result.response.functionCalls();
@@ -404,30 +503,45 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
         }
       }
       else if (call.name === "saveDietPlan") {
-        const { 
-          breakfastName, breakfastCalories, 
-          lunchName, lunchCalories, 
-          dinnerName, dinnerCalories, 
-          snackName, snackCalories 
-        } = call.args;
+        const { isWeekly, daily, weekly } = call.args;
 
         user.profile = {
           ...user.profile,
           dietPlan: {
-            breakfast: { name: breakfastName, calories: breakfastCalories || 0 },
-            lunch: { name: lunchName, calories: lunchCalories || 0 },
-            dinner: { name: dinnerName, calories: dinnerCalories || 0 },
-            snack: { name: snackName || "", calories: snackCalories || 0 }
+            isWeekly: !!isWeekly,
+            daily: daily || {
+              breakfast: { name: "", calories: 0 },
+              lunch: { name: "", calories: 0 },
+              dinner: { name: "", calories: 0 },
+              snack: { name: "", calories: 0 }
+            },
+            weekly: weekly || {
+              monday: { breakfast: { name: "", calories: 0 }, lunch: { name: "", calories: 0 }, dinner: { name: "", calories: 0 }, snack: { name: "", calories: 0 } },
+              tuesday: { breakfast: { name: "", calories: 0 }, lunch: { name: "", calories: 0 }, dinner: { name: "", calories: 0 }, snack: { name: "", calories: 0 } },
+              wednesday: { breakfast: { name: "", calories: 0 }, lunch: { name: "", calories: 0 }, dinner: { name: "", calories: 0 }, snack: { name: "", calories: 0 } },
+              thursday: { breakfast: { name: "", calories: 0 }, lunch: { name: "", calories: 0 }, dinner: { name: "", calories: 0 }, snack: { name: "", calories: 0 } },
+              friday: { breakfast: { name: "", calories: 0 }, lunch: { name: "", calories: 0 }, dinner: { name: "", calories: 0 }, snack: { name: "", calories: 0 } },
+              saturday: { breakfast: { name: "", calories: 0 }, lunch: { name: "", calories: 0 }, dinner: { name: "", calories: 0 }, snack: { name: "", calories: 0 } },
+              sunday: { breakfast: { name: "", calories: 0 }, lunch: { name: "", calories: 0 }, dinner: { name: "", calories: 0 }, snack: { name: "", calories: 0 } }
+            }
           }
         };
 
         await user.save();
-        replyText = `🥗 I have successfully created and saved your customized diet plan!\n\n` +
-          `* **Breakfast:** ${breakfastName} (~${breakfastCalories} kcal)\n` +
-          `* **Lunch:** ${lunchName} (~${lunchCalories} kcal)\n` +
-          `* **Dinner:** ${dinnerName} (~${dinnerCalories} kcal)\n` +
-          (snackName ? `* **Snack:** ${snackName} (~${snackCalories} kcal)\n` : "") +
-          `\nThis diet chart has been saved to your profile and is now visible on your Dashboard!`;
+        
+        if (isWeekly) {
+          replyText = `🥗 I have successfully created and saved your customized 7-day weekly diet plan!\n\n` +
+            `It has been saved to your profile and is now visible on your Dashboard, where it will display day-by-day!`;
+        } else {
+          const b = daily?.breakfast?.name || "None";
+          const l = daily?.lunch?.name || "None";
+          const d = daily?.dinner?.name || "None";
+          replyText = `🥗 I have successfully created and saved your daily diet plan!\n\n` +
+            `* **Breakfast:** ${b} (~${daily?.breakfast?.calories || 0} kcal)\n` +
+            `* **Lunch:** ${l} (~${daily?.lunch?.calories || 0} kcal)\n` +
+            `* **Dinner:** ${d} (~${daily?.dinner?.calories || 0} kcal)\n` +
+            `\nThis diet chart has been saved and is now visible on your Dashboard!`;
+        }
       }
     } else {
       replyText = result.response.text();

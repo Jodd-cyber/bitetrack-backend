@@ -17,10 +17,57 @@ const userSchema = new mongoose.Schema(
       aiInsights: { type: String },
       aiInsightsUpdatedAt: { type: Date },
       dietPlan: {
-        breakfast: { name: String, calories: Number },
-        lunch: { name: String, calories: Number },
-        dinner: { name: String, calories: Number },
-        snack: { name: String, calories: Number }
+        isWeekly: { type: Boolean, default: false },
+        daily: {
+          breakfast: { name: String, calories: Number },
+          lunch: { name: String, calories: Number },
+          dinner: { name: String, calories: Number },
+          snack: { name: String, calories: Number }
+        },
+        weekly: {
+          monday: {
+            breakfast: { name: String, calories: Number },
+            lunch: { name: String, calories: Number },
+            dinner: { name: String, calories: Number },
+            snack: { name: String, calories: Number }
+          },
+          tuesday: {
+            breakfast: { name: String, calories: Number },
+            lunch: { name: String, calories: Number },
+            dinner: { name: String, calories: Number },
+            snack: { name: String, calories: Number }
+          },
+          wednesday: {
+            breakfast: { name: String, calories: Number },
+            lunch: { name: String, calories: Number },
+            dinner: { name: String, calories: Number },
+            snack: { name: String, calories: Number }
+          },
+          thursday: {
+            breakfast: { name: String, calories: Number },
+            lunch: { name: String, calories: Number },
+            dinner: { name: String, calories: Number },
+            snack: { name: String, calories: Number }
+          },
+          friday: {
+            breakfast: { name: String, calories: Number },
+            lunch: { name: String, calories: Number },
+            dinner: { name: String, calories: Number },
+            snack: { name: String, calories: Number }
+          },
+          saturday: {
+            breakfast: { name: String, calories: Number },
+            lunch: { name: String, calories: Number },
+            dinner: { name: String, calories: Number },
+            snack: { name: String, calories: Number }
+          },
+          sunday: {
+            breakfast: { name: String, calories: Number },
+            lunch: { name: String, calories: Number },
+            dinner: { name: String, calories: Number },
+            snack: { name: String, calories: Number }
+          }
+        }
       }
     },
     gmailSyncTokens: {
