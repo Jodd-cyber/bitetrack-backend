@@ -190,6 +190,24 @@ Please provide a helpful, friendly, and concise answer. Do not invent any data.`
                 specificDateQuery: { type: "STRING", description: "Optional. A specific date string (e.g. '2026/04/30') to search for. Format must be YYYY/MM/DD. If omitted, will search recent emails." }
               }
             }
+          },
+          {
+            name: "saveDietPlan",
+            description: "Save a structured daily diet plan for the user. Call this when the user asks you to create, save, or update their diet plan, meal plan, or diet chart.",
+            parameters: {
+              type: "OBJECT",
+              properties: {
+                breakfastName: { type: "STRING", description: "Breakfast food name and details" },
+                breakfastCalories: { type: "NUMBER", description: "Estimated calories for breakfast" },
+                lunchName: { type: "STRING", description: "Lunch food name and details" },
+                lunchCalories: { type: "NUMBER", description: "Estimated calories for lunch" },
+                dinnerName: { type: "STRING", description: "Dinner food name and details" },
+                dinnerCalories: { type: "NUMBER", description: "Estimated calories for dinner" },
+                snackName: { type: "STRING", description: "Snack food name and details" },
+                snackCalories: { type: "NUMBER", description: "Estimated calories for snack" }
+              },
+              required: ["breakfastName", "breakfastCalories", "lunchName", "lunchCalories", "dinnerName", "dinnerCalories"]
+            }
           }
         ]
       }
@@ -377,6 +395,32 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
             replyText = `❌ I encountered an error while trying to read your Gmail: ${gmailErr.message}`;
           }
         }
+      }
+      else if (call.name === "saveDietPlan") {
+        const { 
+          breakfastName, breakfastCalories, 
+          lunchName, lunchCalories, 
+          dinnerName, dinnerCalories, 
+          snackName, snackCalories 
+        } = call.args;
+
+        user.profile = {
+          ...user.profile,
+          dietPlan: {
+            breakfast: { name: breakfastName, calories: breakfastCalories || 0 },
+            lunch: { name: lunchName, calories: lunchCalories || 0 },
+            dinner: { name: dinnerName, calories: dinnerCalories || 0 },
+            snack: { name: snackName || "", calories: snackCalories || 0 }
+          }
+        };
+
+        await user.save();
+        replyText = `🥗 I have successfully created and saved your customized diet plan!\n\n` +
+          `* **Breakfast:** ${breakfastName} (~${breakfastCalories} kcal)\n` +
+          `* **Lunch:** ${lunchName} (~${lunchCalories} kcal)\n` +
+          `* **Dinner:** ${dinnerName} (~${dinnerCalories} kcal)\n` +
+          (snackName ? `* **Snack:** ${snackName} (~${snackCalories} kcal)\n` : "") +
+          `\nThis diet chart has been saved to your profile and is now visible on your Dashboard!`;
       }
     } else {
       replyText = result.response.text();

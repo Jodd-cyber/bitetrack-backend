@@ -15,7 +15,13 @@ const userSchema = new mongoose.Schema(
       goal: { type: String, enum: ['lose', 'maintain', 'gain', ''] },
       avatar: { type: String },
       aiInsights: { type: String },
-      aiInsightsUpdatedAt: { type: Date }
+      aiInsightsUpdatedAt: { type: Date },
+      dietPlan: {
+        breakfast: { name: String, calories: Number },
+        lunch: { name: String, calories: Number },
+        dinner: { name: String, calories: Number },
+        snack: { name: String, calories: Number }
+      }
     },
     gmailSyncTokens: {
       access_token: String,
