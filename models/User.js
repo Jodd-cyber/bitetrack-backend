@@ -8,12 +8,12 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: String,
     resetPasswordExpires: Date,
     profile: {
-      age: { type: Number },
-      height: { type: Number }, // in cm
-      weight: { type: Number }, // in kg
-      gender: { type: String, enum: ['male', 'female', 'other', ''] },
-      goal: { type: String, enum: ['lose', 'maintain', 'gain', ''] },
-      avatar: { type: String },
+      age: { type: Number, default: 0 },
+      height: { type: Number, default: 0 }, // in cm
+      weight: { type: Number, default: 0 }, // in kg
+      gender: { type: String, enum: ['male', 'female', 'other', ''], default: '' },
+      goal: { type: String, enum: ['lose', 'maintain', 'gain', ''], default: '' },
+      avatar: { type: String, default: '🍕' },
       aiInsights: { type: String },
       aiInsightsUpdatedAt: { type: Date },
       dietPlan: {
