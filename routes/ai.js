@@ -93,7 +93,14 @@ ${previousContext || "No previous conversation."}
 
 User's new query: "${message}"
 
-Please provide a helpful, friendly, and concise answer. Do not invent any data.`;
+INSTRUCTIONS FOR DIET PLANS & HEALTH:
+- If the user asks you to create, generate, make, or update a diet plan, meal plan, or diet chart, you MUST generate a realistic, healthy, and complete daily plan (including Breakfast, Lunch, Dinner, and optionally Snack) on your own based on their health profile and goals.
+- Estimate realistic calorie counts for each generated meal.
+- Immediately call the 'saveDietPlan' tool under the hood to save it to their profile.
+- You are fully authorized to generate food recipes and meal recommendations; do not ask the user what to put, generate it for them!
+- For health queries, give complete, helpful, and science-backed nutritional advice. Do not say you cannot answer.
+
+Please provide a helpful, friendly, and concise answer. (Do not invent historical food logs, but do design and suggest diet plans/meals when asked).`;
 
     // Define the tools for the AI to use
     const tools = [
