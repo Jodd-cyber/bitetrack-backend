@@ -456,6 +456,18 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
     
     // Check if the AI decided to call a function
     const calls = result.response.functionCalls();
+    
+    // Check if it is a diet plan upload parsing request
+    const isDietUploadReq = fileBase64 && message && message.includes("diet plan file");
+    if (isDietUploadReq) {
+      const hasSaveDietPlan = calls && calls.some(c => c.name === "saveDietPlan");
+      if (!hasSaveDietPlan) {
+        return res.status(400).json({
+          message: "The uploaded file could not be parsed as a diet plan. Please ensure it is a clear image or document of a diet/meal chart."
+        });
+      }
+    }
+
     let replyText = "";
     let functionSummary = "";
     let callName = "";
