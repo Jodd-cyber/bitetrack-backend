@@ -461,21 +461,29 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
       
       if (call.name === "addFoodLog") {
         const { mealType, restaurant, amount, items, notes, time, rating, date } = call.args;
-        let cleanNotes = notes ? notes.replace(/rated\s*\d+\s*stars?/gi, '').trim() : "";
-        const newLog = new FoodLog({
-          user: req.user.id,
-          date: date ? new Date(date) : new Date(),
-          mealType: mealType || 'Snack',
-          restaurant: restaurant || 'Unknown',
-          amount: amount || 0,
-          items: items || [],
-          notes: cleanNotes,
-          time: time || "",
-          rating: rating || 0
-        });
-        await newLog.save();
-        const foodNames = items ? items.map(i => i.name).join(', ') : 'your meal';
-        functionSummary = `Logged ${mealType} (${foodNames}) at ${restaurant} for ₹${amount} successfully.`;
+        const restLower = restaurant ? restaurant.toLowerCase().trim() : "";
+        const isHomeCooked = restLower === "home" || restLower === "home cooked" || restLower === "home-cooked" || restLower === "homecooked";
+        
+        if (isHomeCooked) {
+          const foodNames = items ? items.map(i => i.name).join(', ') : 'your meal';
+          functionSummary = `Acknowledged eating ${mealType} (${foodNames}) at Home, but did NOT save it to the database because home-cooked meals are not stored in the database.`;
+        } else {
+          let cleanNotes = notes ? notes.replace(/rated\s*\d+\s*stars?/gi, '').trim() : "";
+          const newLog = new FoodLog({
+            user: req.user.id,
+            date: date ? new Date(date) : new Date(),
+            mealType: mealType || 'Snack',
+            restaurant: restaurant || 'Unknown',
+            amount: amount || 0,
+            items: items || [],
+            notes: cleanNotes,
+            time: time || "",
+            rating: rating || 0
+          });
+          await newLog.save();
+          const foodNames = items ? items.map(i => i.name).join(', ') : 'your meal';
+          functionSummary = `Logged ${mealType} (${foodNames}) at ${restaurant} for ₹${amount} successfully.`;
+        }
       }
       else if (call.name === "deleteFoodLog") {
         const { logId } = call.args;
