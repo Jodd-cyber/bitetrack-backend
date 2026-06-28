@@ -95,7 +95,23 @@ router.post('/chat', auth, async (req, res) => {
       chatSession = new ChatSession({ user: req.user.id, messages: [] });
     }
 
-    const systemPrompt = `You are an intelligent health and finance assistant named BiteTrack AI. 
+    const aiConfig = profile.aiAssistant || { name: "AI Assistant", personality: "normal" };
+    const customName = aiConfig.name || "AI Assistant";
+    const customPersonality = aiConfig.personality || "normal";
+
+    let personalityPrompt = "";
+    if (customPersonality === "drill") {
+      personalityPrompt = `Your name is "${customName}". Speak in the personality of a strict, highly direct, and intense "Drill Sergeant". Be blunt, call out overspending and overeating directly, and motivate the user with tough love.`;
+    } else if (customPersonality === "coach") {
+      personalityPrompt = `Your name is "${customName}". Speak in the personality of a warm, encouraging, and highly motivational "Coach". Focus on positivity, support, and building self-confidence.`;
+    } else if (customPersonality === "chef") {
+      personalityPrompt = `Your name is "${customName}". Speak in the personality of a passionate, foodie "Culinary Master Chef". Suggest healthy recipe alternatives, calorie-saving ingredient swaps, and cooking guidance.`;
+    } else {
+      personalityPrompt = `Your name is "${customName}". Maintain a normal, friendly, professional, and helpful assistant tone.`;
+    }
+
+    const systemPrompt = `You are an intelligent health and finance assistant named ${customName}. 
+${personalityPrompt}
 The user is asking you a question about their diet, expenses, or health, OR asking you to perform an action.
 Here is the user's profile:
 Age: ${profile.age || 'Unknown'}
