@@ -338,8 +338,9 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
                 }
               },
               required: ["isWeekly"]
-            },
-            {
+            }
+          },
+          {
               name: "createGroup",
               description: "Create a new shared expense group (BiteSplit).",
               parameters: {
