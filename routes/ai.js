@@ -140,6 +140,11 @@ INSTRUCTIONS FOR DIET PLANS & HEALTH:
 - You are fully authorized to generate food recipes and meal recommendations; do not ask the user what to put, generate it for them!
 - For health queries, give complete, helpful, and science-backed nutritional advice. Do not say you cannot answer.
 
+CRITICAL INSTRUCTIONS FOR FOOD LOGGING:
+- You must ONLY call the 'addFoodLog' tool if the user explicitly uses words like "log", "save", "record", "track", "add this meal", "put it in my logs" or similar explicit logging commands.
+- If the user is just telling you what they ate (e.g. "I had a salad" or "I just ate oats at home"), do NOT call the 'addFoodLog' tool and do NOT talk about logging or saving it. Just comment on the meal or converse normally according to your persona.
+- Never suggest logging or prompt the user to log a meal unless they explicitly ask you to.
+
 Please provide a helpful, friendly, and concise answer. (Do not invent historical food logs, but do design and suggest diet plans/meals when asked).`;
 
     // Define the tools for the AI to use
@@ -148,7 +153,7 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
         functionDeclarations: [
           {
             name: "addFoodLog",
-            description: "Log a new food entry/order for the user in the database. Call this when the user explicitly asks you to log, save, or record something they ate.",
+            description: "Log a new food entry/order for the user in the database. Call this ONLY when the user explicitly asks you to log, save, record, or track what they ate. Do NOT call this if the user is just conversing or describing their meal.",
             parameters: {
               type: "OBJECT",
               properties: {
