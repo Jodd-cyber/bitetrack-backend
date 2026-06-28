@@ -452,9 +452,12 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
     // Check if the AI decided to call a function
     const calls = result.response.functionCalls();
     let replyText = "";
+    let functionSummary = "";
+    let callName = "";
     
     if (calls && calls.length > 0) {
       const call = calls[0];
+      callName = call.name;
       
       if (call.name === "addFoodLog") {
         const { mealType, restaurant, amount, items, notes, time, rating, date } = call.args;
@@ -472,15 +475,15 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
         });
         await newLog.save();
         const foodNames = items ? items.map(i => i.name).join(', ') : 'your meal';
-        replyText = `✅ Successfully logged **${foodNames}** for ${mealType} at ${restaurant} (₹${amount}). I have saved this directly to your database!`;
+        functionSummary = `Logged ${mealType} (${foodNames}) at ${restaurant} for ₹${amount} successfully.`;
       }
       else if (call.name === "deleteFoodLog") {
         const { logId } = call.args;
         const deleted = await FoodLog.findOneAndDelete({ _id: logId, user: req.user.id });
         if (deleted) {
-          replyText = `🗑️ Successfully deleted the log from ${deleted.date ? new Date(deleted.date).toLocaleDateString() : 'that day'}.`;
+          functionSummary = `Deleted the food log from ${deleted.date ? new Date(deleted.date).toLocaleDateString() : 'that day'} successfully.`;
         } else {
-          replyText = `❌ I couldn't find a log with that exact ID to delete, or it might have already been removed.`;
+          functionSummary = `Could not find a log with that exact ID to delete, or it might have already been removed.`;
         }
       }
       else if (call.name === "editFoodLog") {
@@ -504,9 +507,9 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
         );
 
         if (updated) {
-          replyText = `✅ Successfully updated the order.`;
+          functionSummary = `Updated the order details successfully.`;
         } else {
-          replyText = `❌ I couldn't find a log with that exact ID to update, or it might have been removed.`;
+          functionSummary = `Could not find a log with that exact ID to update.`;
         }
       }
       else if (call.name === "updateProfile") {
@@ -514,13 +517,13 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
         if (Object.keys(updates).length > 0) {
           user.profile = { ...user.profile, ...updates };
           await user.save();
-          replyText = `✅ I have successfully updated your profile with the new information!`;
+          functionSummary = `Updated profile with new information: ${JSON.stringify(updates)} successfully.`;
         }
       }
       else if (call.name === "syncGmailOrders") {
         const { specificDateQuery } = call.args;
         if (!user.gmailSyncTokens || !user.gmailSyncTokens.access_token) {
-          replyText = `❌ Your Gmail account is not connected. Please go to the Ledger page and click "Sync Zomato/Swiggy from Gmail" to connect it first!`;
+          functionSummary = `Error: Gmail account is not connected. The user must go to the Ledger page and connect it first.`;
         } else {
           try {
             const client = new google.auth.OAuth2(
@@ -541,7 +544,7 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
             const gmail = google.gmail({ version: 'v1', auth: client });
             let baseQuery = '(from:noreply@zomato.com OR from:swiggy@swiggy.in OR from:noreply@swiggy.in) (subject:"Order" OR subject:"Receipt" OR subject:"Summary")';
             if (specificDateQuery) {
-              baseQuery += ` after:${specificDateQuery.replace(/\//g, '/')} before:${new Date(new Date(specificDateQuery).getTime() + 86400000 * 2).toISOString().split('T')[0].replace(/-/g, '/')}`; // give a 2 day window
+              baseQuery += ` after:${specificDateQuery.replace(/\//g, '/')} before:${new Date(new Date(specificDateQuery).getTime() + 86400000 * 2).toISOString().split('T')[0].replace(/-/g, '/')}`;
             }
 
             const response = await gmail.users.messages.list({
@@ -552,7 +555,7 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
 
             const messages = response.data.messages || [];
             if (messages.length === 0) {
-              replyText = `I checked your Gmail ${specificDateQuery ? 'around ' + specificDateQuery : 'recently'} but couldn't find any Swiggy or Zomato orders.`;
+              functionSummary = `Checked Gmail ${specificDateQuery ? 'around ' + specificDateQuery : 'recently'} but couldn't find any Swiggy or Zomato orders.`;
             } else {
               let newOrdersCount = 0;
               for (let msg of messages) {
@@ -564,7 +567,6 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
                       if (part.body && part.body.data) {
                         let decoded = Buffer.from(part.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
                         if (part.mimeType === 'text/html') {
-                          // Strip simple HTML tags to reduce token size, keep text
                           decoded = decoded.replace(/<style[^>]*>.*?<\/style>/gi, '')
                                            .replace(/<script[^>]*>.*?<\/script>/gi, '')
                                            .replace(/<[^>]+>/g, ' ')
@@ -617,13 +619,13 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
                   }
                 } catch (e) { console.error("AI Assistant Gmail parse error", e.message); }
               }
-              replyText = newOrdersCount > 0 
-                ? `✅ I found and synced **${newOrdersCount} new orders** from your Gmail!` 
-                : `I checked the matching emails, but those orders were either already synced or didn't contain valid receipt details.`;
+              functionSummary = newOrdersCount > 0 
+                ? `Found and synced ${newOrdersCount} new orders from Gmail successfully.` 
+                : `Checked the matching emails, but those orders were either already synced or didn't contain valid receipt details.`;
             }
           } catch (gmailErr) {
             console.error("Gmail tool error:", gmailErr);
-            replyText = `❌ I encountered an error while trying to read your Gmail: ${gmailErr.message}`;
+            functionSummary = `Error: Failed to read Gmail due to: ${gmailErr.message}`;
           }
         }
       }
@@ -655,17 +657,12 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
         await user.save();
         
         if (isWeekly) {
-          replyText = `🥗 I have successfully created and saved your customized 7-day weekly diet plan!\n\n` +
-            `It has been saved to your profile and is now visible on your Dashboard, where it will display day-by-day!`;
+          functionSummary = `Created and saved a customized 7-day weekly diet plan successfully.`;
         } else {
           const b = daily?.breakfast?.name || "None";
           const l = daily?.lunch?.name || "None";
           const d = daily?.dinner?.name || "None";
-          replyText = `🥗 I have successfully created and saved your daily diet plan!\n\n` +
-            `* **Breakfast:** ${b} (~${daily?.breakfast?.calories || 0} kcal)\n` +
-            `* **Lunch:** ${l} (~${daily?.lunch?.calories || 0} kcal)\n` +
-            `* **Dinner:** ${d} (~${daily?.dinner?.calories || 0} kcal)\n` +
-            `\nThis diet chart has been saved and is now visible on your Dashboard!`;
+          functionSummary = `Created and saved a daily diet plan (Breakfast: ${b}, Lunch: ${l}, Dinner: ${d}) successfully.`;
         }
       }
       else if (call.name === "createGroup") {
@@ -684,13 +681,10 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
             members: [req.user.id],
             createdBy: req.user.id,
           });
-          replyText = `👥 Group **"${group.name}"** has been created successfully!\n\n` +
-            `* **Invite Code:** \`${group.inviteCode}\`\n` +
-            `* **Group ID:** \`${group._id}\`\n\n` +
-            `Share the invite code with other users so they can join!`;
+          functionSummary = `Created BiteSplit group "${group.name}" successfully with Invite Code "${group.inviteCode}".`;
         } catch (groupErr) {
           console.error("Create group tool error:", groupErr);
-          replyText = `❌ Failed to create group: ${groupErr.message}`;
+          functionSummary = `Error: Failed to create group: ${groupErr.message}`;
         }
       }
       else if (call.name === "joinGroup") {
@@ -699,19 +693,19 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
           const cleanCode = inviteCode.trim().toUpperCase();
           const group = await Group.findOne({ inviteCode: cleanCode });
           if (!group) {
-            replyText = `❌ Could not find a group with invite code \`${cleanCode}\`. Please verify the code and try again!`;
+            functionSummary = `Error: Could not find a group with invite code "${cleanCode}".`;
           } else {
             if (group.members.some(m => m.toString() === req.user.id.toString())) {
-              replyText = `👥 You are already a member of the group **"${group.name}"**!`;
+              functionSummary = `User is already a member of the group "${group.name}".`;
             } else {
               group.members.push(req.user.id);
               await group.save();
-              replyText = `👥 Success! You have joined the group **"${group.name}"**!`;
+              functionSummary = `Joined group "${group.name}" successfully.`;
             }
           }
         } catch (joinErr) {
           console.error("Join group tool error:", joinErr);
-          replyText = `❌ Failed to join group: ${joinErr.message}`;
+          functionSummary = `Error: Failed to join group: ${joinErr.message}`;
         }
       }
       else if (call.name === "addSplitFoodLog") {
@@ -719,7 +713,7 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
         try {
           const group = await Group.findById(groupId);
           if (!group) {
-            replyText = `❌ Group not found. Please verify the group ID or name.`;
+            functionSummary = `Error: Group not found.`;
           } else {
             const validatedShares = [];
             const sharesList = shares || [];
@@ -759,16 +753,11 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
               }
             });
             
-            replyText = `💸 Split bill logged successfully!\n\n` +
-              `* **Restaurant:** ${restaurant}\n` +
-              `* **Total:** ₹${amount}\n` +
-              `* **Group:** ${group.name}\n` +
-              `* **Method:** Split ${splitMethod === 'equal' ? 'Equally' : 'Unequally'}\n\n` +
-              `The transaction has been posted to the ledger and split between the group members!`;
+            functionSummary = `Logged split bill at ${restaurant} for ₹${amount} in group "${group.name}" split ${splitMethod}ly successfully.`;
           }
         } catch (splitLogErr) {
           console.error("Add split log tool error:", splitLogErr);
-          replyText = `❌ Failed to log split transaction: ${splitLogErr.message}`;
+          functionSummary = `Error: Failed to log split transaction: ${splitLogErr.message}`;
         }
       }
       else if (call.name === "createGroupSettlement") {
@@ -776,12 +765,12 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
         try {
           const group = await Group.findById(groupId);
           if (!group) {
-            replyText = `❌ Group not found.`;
+            functionSummary = `Error: Group not found.`;
           } else {
             const isFromMember = group.members.some(m => m.toString() === req.user.id.toString());
             const isToMember = group.members.some(m => m.toString() === toUserId.toString());
             if (!isFromMember || !isToMember) {
-              replyText = `❌ Both users must be members of the selected group.`;
+              functionSummary = `Error: Both users must be members of the selected group.`;
             } else {
               const settlement = await Settlement.create({
                 groupId,
@@ -792,14 +781,12 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
               });
               
               const toUserDoc = await User.findById(toUserId);
-              replyText = `🤝 Settlement payment of **₹${amount}** to **${toUserDoc ? toUserDoc.name : 'User'}** has been recorded!\n` +
-                `* **Status:** Pending approval\n\n` +
-                `The recipient must approve this settlement to clear the debt from the ledger.`;
+              functionSummary = `Recorded settlement payment of ₹${amount} to "${toUserDoc ? toUserDoc.name : 'member'}" (Pending approval) successfully.`;
             }
           }
         } catch (settlErr) {
           console.error("Create settlement tool error:", settlErr);
-          replyText = `❌ Failed to record settlement payment: ${settlErr.message}`;
+          functionSummary = `Error: Failed to record settlement payment: ${settlErr.message}`;
         }
       }
       else if (call.name === "acceptGroupSettlement") {
@@ -807,28 +794,46 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
         try {
           const group = await Group.findById(groupId);
           if (!group) {
-            replyText = `❌ Group not found.`;
+            functionSummary = `Error: Group not found.`;
           } else {
             const settlement = await Settlement.findById(settlementId);
             if (!settlement) {
-              replyText = `❌ Settlement transaction not found.`;
+              functionSummary = `Error: Settlement transaction not found.`;
             } else if (settlement.toUser.toString() !== req.user.id.toString()) {
-              replyText = `❌ Only the recipient (the person who was paid) can approve this settlement.`;
+              functionSummary = `Error: Only the recipient can approve this settlement.`;
             } else {
               settlement.status = "completed";
               await settlement.save();
               
               const payer = await User.findById(settlement.fromUser);
-              replyText = `✅ Settlement approved! The payment of **₹${settlement.amount}** from **${payer ? payer.name : 'User'}** has been confirmed and marked as completed. The debt has been cleared.`;
+              functionSummary = `Approved settlement of ₹${settlement.amount} from "${payer ? payer.name : 'payer'}" successfully.`;
             }
           }
         } catch (acceptErr) {
           console.error("Accept settlement tool error:", acceptErr);
-          replyText = `❌ Failed to approve settlement: ${acceptErr.message}`;
+          functionSummary = `Error: Failed to approve settlement: ${acceptErr.message}`;
         }
       }
     } else {
       replyText = result.response.text();
+    }
+
+    if (functionSummary) {
+      try {
+        const followUpPrompt = `System Notification: You called the tool "${callName}" to satisfy the user's request. The database action was executed successfully: "${functionSummary}". 
+Now, write the final conversational response to the user's request: "${message}". 
+You MUST reply directly in your configured identity (Name: ${customName}, Persona: ${customPersonality}). 
+Be warm and encouraging if Coach, strict/blunt if Drill Sergeant, food-passionate if Chef, or normal/friendly if Normal. Keep it natural, friendly, do not repeat technical IDs, and do not mention "System Notification" or "tool".`;
+        
+        const followUpResult = await model.generateContent([
+          systemPrompt,
+          { text: followUpPrompt }
+        ]);
+        replyText = followUpResult.response.text();
+      } catch (followUpErr) {
+        console.error("Follow up persona generation failed:", followUpErr);
+        replyText = `✅ Action completed: ${functionSummary}`;
+      }
     }
 
     chatSession.messages.push({ role: 'user', text: message });
