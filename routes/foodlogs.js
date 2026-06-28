@@ -93,16 +93,16 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(401).json({ message: "Not authorized" });
     }
 
-    log.items = req.body.items || [];
-    log.amount = Number(req.body.amount) || 0;
-    log.notes = req.body.notes || '';
-    log.restaurant = req.body.restaurant || '';
+    log.items = req.body.items || log.items;
+    log.amount = req.body.amount !== undefined ? Number(req.body.amount) : log.amount;
+    log.notes = req.body.notes !== undefined ? req.body.notes : log.notes;
+    log.restaurant = req.body.restaurant || log.restaurant;
 
-    log.mealType = req.body.mealType || "Lunch";
-    log.date = req.body.date;
-    log.time = req.body.time || "";
-    log.rating = Number(req.body.rating) || 0;
-    log.images = req.body.images || [];
+    log.mealType = req.body.mealType || log.mealType;
+    log.date = req.body.date || log.date;
+    log.time = req.body.time !== undefined ? req.body.time : log.time;
+    log.rating = req.body.rating !== undefined ? Number(req.body.rating) : log.rating;
+    log.images = req.body.images || log.images;
     if (req.body.splitInfo) {
       log.splitInfo = req.body.splitInfo;
     }

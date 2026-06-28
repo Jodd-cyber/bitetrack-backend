@@ -5,6 +5,8 @@ const User = require('../models/User');
 const FoodLog = require('../models/FoodLog');
 const ChatSession = require('../models/ChatSession');
 const Budget = require('../models/Budget');
+const Group = require('../models/Group');
+const Settlement = require('../models/Settlement');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { google } = require('googleapis');
 
@@ -48,6 +50,25 @@ router.post('/chat', auth, async (req, res) => {
 
     const totalSpent = logs.reduce((sum, log) => sum + (log.amount || 0), 0);
 
+    // Fetch user's groups context
+    const userGroups = await Group.find({ members: req.user.id });
+    let groupsContext = "No active BiteSplit groups.";
+    if (userGroups && userGroups.length > 0) {
+      const populatedGroups = [];
+      for (const group of userGroups) {
+        const members = await User.find({ _id: { $in: group.members } }).select('name email');
+        const memberList = members.map(m => `${m.name} (User ID: ${m._id}, Email: ${m.email})`).join(', ');
+        
+        const pendingSettlements = await Settlement.find({ groupId: group._id, status: 'pending' }).populate('fromUser toUser', 'name');
+        const settlementsStr = pendingSettlements.length > 0
+          ? pendingSettlements.map(s => `[Settlement ID: ${s._id}] ${s.fromUser?.name || 'Unknown'} paid ${s.toUser?.name || 'Unknown'} ₹${s.amount}`).join('; ')
+          : "None";
+          
+        populatedGroups.push(`- Group Name: "${group.name}" (Group ID: ${group._id}, Invite Code: ${group.inviteCode})\n  Members: ${memberList}\n  Pending Settlements: ${settlementsStr}`);
+      }
+      groupsContext = populatedGroups.join('\n');
+    }
+
     let formattedLogs = 'No food logs recorded in the last 30 days.';
     try {
       if (logs && logs.length > 0) {
@@ -83,6 +104,9 @@ Weight: ${profile.weight ? profile.weight + ' kg' : 'Unknown'}
 Gender: ${profile.gender || 'Unknown'}
 Goal: ${profile.goal || 'Unknown'}
 ${bmr ? `Calculated Basal Metabolic Rate (BMR): ~${Math.round(bmr)} kcal/day. Maintenance Calories: ~${Math.round(tdee)} kcal/day.` : 'Not enough profile data to calculate exact calorie needs.'}
+
+Here is the user's BiteSplit Group Context (their shared expenses groups, members, and pending transactions):
+${groupsContext}
 
 Here are the user's food logs for the past 30 days:
 ${formattedLogs}
@@ -298,11 +322,95 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
                 }
               },
               required: ["isWeekly"]
+            },
+            {
+              name: "createGroup",
+              description: "Create a new shared expense group (BiteSplit).",
+              parameters: {
+                type: "OBJECT",
+                properties: {
+                  name: { type: "STRING", description: "Name of the group (e.g. Roommates)" }
+                },
+                required: ["name"]
+              }
+            },
+            {
+              name: "joinGroup",
+              description: "Join an existing shared expense group (BiteSplit) using an invite code.",
+              parameters: {
+                type: "OBJECT",
+                properties: {
+                  inviteCode: { type: "STRING", description: "The 6-character alphanumeric invite code (e.g., AB12CD)" }
+                },
+                required: ["inviteCode"]
+              }
+            },
+            {
+              name: "addSplitFoodLog",
+              description: "Log a split bill/transaction for a BiteSplit group. Paid by the current user.",
+              parameters: {
+                type: "OBJECT",
+                properties: {
+                  mealType: { type: "STRING", description: "Breakfast, Lunch, Dinner, Snack" },
+                  restaurant: { type: "STRING", description: "Restaurant or food provider" },
+                  amount: { type: "NUMBER", description: "Total bill amount to split" },
+                  groupId: { type: "STRING", description: "Group ID to post the split to" },
+                  splitMethod: { type: "STRING", description: "equal or unequal" },
+                  shares: {
+                    type: "ARRAY",
+                    description: "Explicit user shares for unequal splits. For equal splits, omit this.",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        userId: { type: "STRING", description: "The member's User ID" },
+                        amount: { type: "NUMBER", description: "Their share of the bill" }
+                      }
+                    }
+                  },
+                  items: {
+                    type: "ARRAY",
+                    description: "Optional list of items",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        name: { type: "STRING" },
+                        quantity: { type: "NUMBER" }
+                      }
+                    }
+                  },
+                  notes: { type: "STRING" }
+                },
+                required: ["mealType", "restaurant", "amount", "groupId", "splitMethod"]
+              }
+            },
+            {
+              name: "createGroupSettlement",
+              description: "Record a settlement payment to another member in the group (removes your debt).",
+              parameters: {
+                type: "OBJECT",
+                properties: {
+                  groupId: { type: "STRING", description: "Group ID" },
+                  toUserId: { type: "STRING", description: "The User ID of the person you paid" },
+                  amount: { type: "NUMBER", description: "Amount paid to settle" }
+                },
+                required: ["groupId", "toUserId", "amount"]
+              }
+            },
+            {
+              name: "acceptGroupSettlement",
+              description: "Accept and confirm a pending settlement payment sent to you (clears their debt).",
+              parameters: {
+                type: "OBJECT",
+                properties: {
+                  groupId: { type: "STRING", description: "Group ID" },
+                  settlementId: { type: "STRING", description: "The pending Settlement ID" }
+                },
+                required: ["groupId", "settlementId"]
+              }
             }
-          }
-        ]
-      }
-    ];
+          ]
+        }
+      ];
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", tools: tools });
@@ -541,6 +649,165 @@ If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring
             `* **Lunch:** ${l} (~${daily?.lunch?.calories || 0} kcal)\n` +
             `* **Dinner:** ${d} (~${daily?.dinner?.calories || 0} kcal)\n` +
             `\nThis diet chart has been saved and is now visible on your Dashboard!`;
+        }
+      }
+      else if (call.name === "createGroup") {
+        const { name } = call.args;
+        try {
+          let inviteCode = "";
+          let codeExists = true;
+          while (codeExists) {
+            inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const existing = await Group.findOne({ inviteCode });
+            if (!existing) codeExists = false;
+          }
+          const group = await Group.create({
+            name: name.trim(),
+            inviteCode,
+            members: [req.user.id],
+            createdBy: req.user.id,
+          });
+          replyText = `👥 Group **"${group.name}"** has been created successfully!\n\n` +
+            `* **Invite Code:** \`${group.inviteCode}\`\n` +
+            `* **Group ID:** \`${group._id}\`\n\n` +
+            `Share the invite code with other users so they can join!`;
+        } catch (groupErr) {
+          console.error("Create group tool error:", groupErr);
+          replyText = `❌ Failed to create group: ${groupErr.message}`;
+        }
+      }
+      else if (call.name === "joinGroup") {
+        const { inviteCode } = call.args;
+        try {
+          const cleanCode = inviteCode.trim().toUpperCase();
+          const group = await Group.findOne({ inviteCode: cleanCode });
+          if (!group) {
+            replyText = `❌ Could not find a group with invite code \`${cleanCode}\`. Please verify the code and try again!`;
+          } else {
+            if (group.members.some(m => m.toString() === req.user.id.toString())) {
+              replyText = `👥 You are already a member of the group **"${group.name}"**!`;
+            } else {
+              group.members.push(req.user.id);
+              await group.save();
+              replyText = `👥 Success! You have joined the group **"${group.name}"**!`;
+            }
+          }
+        } catch (joinErr) {
+          console.error("Join group tool error:", joinErr);
+          replyText = `❌ Failed to join group: ${joinErr.message}`;
+        }
+      }
+      else if (call.name === "addSplitFoodLog") {
+        const { mealType, restaurant, amount, groupId, splitMethod, shares, items, notes } = call.args;
+        try {
+          const group = await Group.findById(groupId);
+          if (!group) {
+            replyText = `❌ Group not found. Please verify the group ID or name.`;
+          } else {
+            const validatedShares = [];
+            const sharesList = shares || [];
+            
+            if (splitMethod === "equal") {
+              const equalShare = amount / group.members.length;
+              for (const memberId of group.members) {
+                validatedShares.push({
+                  user: memberId,
+                  amount: Math.round(equalShare * 100) / 100
+                });
+              }
+            } else {
+              for (const sh of sharesList) {
+                validatedShares.push({
+                  user: sh.userId,
+                  amount: Number(sh.amount)
+                });
+              }
+            }
+            
+            const newLog = await FoodLog.create({
+              user: req.user.id,
+              items: items || [{ name: "Food Item", quantity: 1 }],
+              amount: Number(amount),
+              notes: notes || "Logged via AI assistant",
+              restaurant: restaurant,
+              mealType: mealType || "Lunch",
+              date: new Date(),
+              time: new Date().toTimeString().slice(0, 5),
+              splitInfo: {
+                isSplit: true,
+                groupId,
+                paidBy: req.user.id,
+                splitMethod: splitMethod || "equal",
+                shares: validatedShares
+              }
+            });
+            
+            replyText = `💸 Split bill logged successfully!\n\n` +
+              `* **Restaurant:** ${restaurant}\n` +
+              `* **Total:** ₹${amount}\n` +
+              `* **Group:** ${group.name}\n` +
+              `* **Method:** Split ${splitMethod === 'equal' ? 'Equally' : 'Unequally'}\n\n` +
+              `The transaction has been posted to the ledger and split between the group members!`;
+          }
+        } catch (splitLogErr) {
+          console.error("Add split log tool error:", splitLogErr);
+          replyText = `❌ Failed to log split transaction: ${splitLogErr.message}`;
+        }
+      }
+      else if (call.name === "createGroupSettlement") {
+        const { groupId, toUserId, amount } = call.args;
+        try {
+          const group = await Group.findById(groupId);
+          if (!group) {
+            replyText = `❌ Group not found.`;
+          } else {
+            const isFromMember = group.members.some(m => m.toString() === req.user.id.toString());
+            const isToMember = group.members.some(m => m.toString() === toUserId.toString());
+            if (!isFromMember || !isToMember) {
+              replyText = `❌ Both users must be members of the selected group.`;
+            } else {
+              const settlement = await Settlement.create({
+                groupId,
+                fromUser: req.user.id,
+                toUser: toUserId,
+                amount: Number(amount),
+                status: 'pending',
+              });
+              
+              const toUserDoc = await User.findById(toUserId);
+              replyText = `🤝 Settlement payment of **₹${amount}** to **${toUserDoc ? toUserDoc.name : 'User'}** has been recorded!\n` +
+                `* **Status:** Pending approval\n\n` +
+                `The recipient must approve this settlement to clear the debt from the ledger.`;
+            }
+          }
+        } catch (settlErr) {
+          console.error("Create settlement tool error:", settlErr);
+          replyText = `❌ Failed to record settlement payment: ${settlErr.message}`;
+        }
+      }
+      else if (call.name === "acceptGroupSettlement") {
+        const { groupId, settlementId } = call.args;
+        try {
+          const group = await Group.findById(groupId);
+          if (!group) {
+            replyText = `❌ Group not found.`;
+          } else {
+            const settlement = await Settlement.findById(settlementId);
+            if (!settlement) {
+              replyText = `❌ Settlement transaction not found.`;
+            } else if (settlement.toUser.toString() !== req.user.id.toString()) {
+              replyText = `❌ Only the recipient (the person who was paid) can approve this settlement.`;
+            } else {
+              settlement.status = "completed";
+              await settlement.save();
+              
+              const payer = await User.findById(settlement.fromUser);
+              replyText = `✅ Settlement approved! The payment of **₹${settlement.amount}** from **${payer ? payer.name : 'User'}** has been confirmed and marked as completed. The debt has been cleared.`;
+            }
+          }
+        } catch (acceptErr) {
+          console.error("Accept settlement tool error:", acceptErr);
+          replyText = `❌ Failed to approve settlement: ${acceptErr.message}`;
         }
       }
     } else {
