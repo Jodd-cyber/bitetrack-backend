@@ -43,15 +43,16 @@ router.put('/profile', auth, async (req, res) => {
     
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.profile = {
-      ...user.profile,
-      ...(age && { age }),
-      ...(height && { height }),
-      ...(weight && { weight }),
-      ...(gender && { gender }),
-      ...(goal && { goal }),
-      ...(avatar !== undefined && { avatar })
-    };
+    if (!user.profile) {
+      user.profile = {};
+    }
+
+    if (age !== undefined) user.profile.age = age;
+    if (height !== undefined) user.profile.height = height;
+    if (weight !== undefined) user.profile.weight = weight;
+    if (gender !== undefined) user.profile.gender = gender;
+    if (goal !== undefined) user.profile.goal = goal;
+    if (avatar !== undefined) user.profile.avatar = avatar;
 
     await user.save();
     res.json(user.profile);
