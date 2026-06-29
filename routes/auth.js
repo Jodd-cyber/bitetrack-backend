@@ -156,10 +156,24 @@ router.post("/forgot-password", async (req, res) => {
 
       await sendEmail(
         email,
-        "Reset your BiteTrack password",
+        "Reset your BiteTrack password 🔑",
         `
-          <h2>Password Reset</h2>
-          <a href="${resetLink}">Reset Password</a>
+          <div style="font-family: sans-serif; padding: 20px; color: #0f172a; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #0f172a; font-weight: 800; font-size: 22px; margin-bottom: 10px;">Reset Your Password 🔑</h2>
+            <p style="color: #475569; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+              You requested to reset your password for your BiteTrack account. Click the button below to set a new password:
+            </p>
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="${resetLink}" style="background-color: #10b981; color: #0f172a; padding: 14px 28px; text-decoration: none; border-radius: 10px; display: inline-block; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Reset Password</a>
+            </div>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+            <p style="font-size: 12px; color: #64748b; line-height: 1.6;">
+              💡 <b>Important Tip:</b> Since this is a test email, if you cannot click the button above, please mark this email as <b>"Not Spam"</b>. Alternatively, you can copy and paste the raw link below directly into your browser:
+            </p>
+            <p style="font-size: 13px; color: #2563eb; word-break: break-all; background-color: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-family: monospace;">
+              ${resetLink}
+            </p>
+          </div>
         `
       );
 
