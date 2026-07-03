@@ -191,6 +191,7 @@ router.get("/", protect, async (req, res) => {
           membersCount: group.members.length,
           members: group.members,
           userNetBalance: Math.round((netBalances[req.user.id] || 0) * 100) / 100,
+          createdBy: group.createdBy,
           createdAt: group.createdAt
         };
       })
