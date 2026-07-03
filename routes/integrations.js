@@ -178,8 +178,9 @@ Structure:
   "date": "YYYY-MM-DD",
   "time": "HH:mm 24-hour",
   "amount": Total amount paid (number),
-  "items": [{ "name": "Item name", "calories": estimated calories (number) }]
+  "items": [{ "name": "Item name", "quantity": number, "calories": estimated calories (number) }]
 }
+CRITICAL: You MUST extract EVERY SINGLE food item listed in the receipt. Do not summarize or omit any items. For each item, extract its exact quantity from the receipt (default to 1 if not found).
 IMPORTANT: This email was received on ${emailDateStr} at ${emailTimeStr}. If the exact order time is not explicitly found in the text, use ${emailTimeStr} as the time and ${emailDateStr} as the date.
 If this email is NOT a valid food order receipt, return { "invalid": true }.
 

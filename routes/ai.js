@@ -617,7 +617,8 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
                 const emailTimeStr = emailDateObj.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
 
                 const prompt = `You are an expert receipt parser. Extract the food order details from this raw email text. STRICTLY JSON.
-{ "restaurant": "name", "date": "YYYY-MM-DD", "time": "HH:mm", "amount": number, "items": [{ "name": "name", "calories": number }] }
+{ "restaurant": "name", "date": "YYYY-MM-DD", "time": "HH:mm", "amount": number, "items": [{ "name": "name", "quantity": number, "calories": number }] }
+CRITICAL: You MUST extract EVERY SINGLE food item listed in the receipt. Do not summarize or omit any items. For each item, extract its exact quantity from the receipt (default to 1 if not found).
 IMPORTANT: This email was received on ${emailDateStr} at ${emailTimeStr}. If the exact order time is not explicitly found in the text, use ${emailTimeStr} as the time and ${emailDateStr} as the date.
 If NOT valid food order, return { "invalid": true }. Text: ${emailText.substring(0, 4000)}`;
 
