@@ -8,14 +8,18 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-// Validate if items are food using Gemini
-async function validateFoodItems(items) {
-  if (!items || items.length === 0) return true;
-  const names = items.map(i => i.name).filter(Boolean);
-  if (names.length === 0) return true;
+// Validate if items are food and restaurant is plausible using Gemini
+async function validateFoodLog(items, restaurant) {
+  if ((!items || items.length === 0) && !restaurant) return true;
+  const names = items ? items.map(i => i.name).filter(Boolean) : [];
 
   try {
-    const prompt = `Analyze this list of item names: ${JSON.stringify(names)}. Are all of these generally considered edible foods, beverages, restaurant dishes, grocery ingredients, snacks, or dining-related expenses? Answer with exactly "YES" or "NO" and nothing else.`;
+    const prompt = `Analyze this food log entry:
+- Food Items: ${JSON.stringify(names)}
+- Restaurant/Location: "${restaurant || ''}"
+
+Are the food items generally considered edible foods, drinks, snacks, or dining expenses, AND is the restaurant/location name a plausible dining place, cafe, food outlet, mess, kitchen, or delivery service (and not profanity, slang, or generic nonsense)? Answer with exactly "YES" or "NO" and nothing else.`;
+
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim().toUpperCase();
     return text.includes("YES");
@@ -38,12 +42,12 @@ router.post('/', auth, async (req, res) => {
 
     // Skip validation for Tapri logs
     if (restaurant !== "Tapri" && notes !== "Tapri Tracker Log") {
-      const isValidFood = await validateFoodItems(items);
-      if (!isValidFood) {
+      const isValidLog = await validateFoodLog(items, restaurant);
+      if (!isValidLog) {
         return res.status(400).json({
           success: false,
           errorType: "NOT_FOOD",
-          message: `Nice try! 😅 "${items.map(i => i.name).join(', ')}" doesn't look like food. Let's stick to actual meals, boss!`
+          message: `Nice try! 😅 "${items.map(i => i.name).join(', ')}" at "${restaurant}" doesn't look like a valid food entry. Let's stick to actual meals and real places, boss!`
         });
       }
     }
@@ -136,12 +140,12 @@ router.put('/:id', auth, async (req, res) => {
 
     // Skip validation for Tapri logs
     if (restaurant !== "Tapri" && notes !== "Tapri Tracker Log") {
-      const isValidFood = await validateFoodItems(items);
-      if (!isValidFood) {
+      const isValidLog = await validateFoodLog(items, restaurant);
+      if (!isValidLog) {
         return res.status(400).json({
           success: false,
           errorType: "NOT_FOOD",
-          message: `Nice try! 😅 "${items.map(i => i.name).join(', ')}" doesn't look like food. Let's stick to actual meals, boss!`
+          message: `Nice try! 😅 "${items.map(i => i.name).join(', ')}" at "${restaurant}" doesn't look like a valid food entry. Let's stick to actual meals and real places, boss!`
         });
       }
     }
