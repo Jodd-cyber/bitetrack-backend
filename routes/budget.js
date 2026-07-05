@@ -6,7 +6,7 @@ const { protect } = require("../middleware/authMiddleware");
 // CREATE or UPDATE budget
 router.post("/", protect, async (req, res) => {
   try {
-    const { amount, saveForAllMonths } = req.body;
+    const { amount, tapriAmount, saveForAllMonths } = req.body;
 
     const userId = req.user.id;
     const now = new Date();
@@ -16,13 +16,15 @@ router.post("/", protect, async (req, res) => {
     let budget = await Budget.findOne({ userId, month, year });
 
     if (budget) {
-      budget.amount = amount;
+      if (amount !== undefined) budget.amount = amount;
+      if (tapriAmount !== undefined) budget.tapriAmount = tapriAmount;
       budget.saveForAllMonths = saveForAllMonths || false;
       await budget.save();
     } else {
       budget = await Budget.create({
         userId,
-        amount,
+        amount: amount || 5000,
+        tapriAmount: tapriAmount || 1500,
         month,
         year,
         saveForAllMonths: saveForAllMonths || false,

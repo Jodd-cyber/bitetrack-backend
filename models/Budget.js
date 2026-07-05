@@ -10,6 +10,10 @@ const budgetSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  tapriAmount: {
+    type: Number,
+    default: 1500,
+  },
   month: {
     type: Number,
     required: true,
