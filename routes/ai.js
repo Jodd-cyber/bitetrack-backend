@@ -926,10 +926,17 @@ router.post('/scan-receipt', auth, async (req, res) => {
 
     const prompt = `You are an expert receipt parser. Look at this receipt image and extract the following information.
 You must return the result STRICTLY as a JSON object with no markdown formatting or extra text.
+
+Carefully scan the receipt image for the transaction date and time:
+- Look for date formats like DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY, MM/DD/YYYY, or text like "Oct 5, 2026".
+- Read all numerical values carefully. Convert it to a strict "YYYY-MM-DD" format.
+- If a year is only two digits (e.g. "26" or "25"), expand it to "2026" or "2025" correctly.
+- Do not default to today's date if any date is readable in the image. If there is absolutely no date, use the current date: "${new Date().toISOString().split('T')[0]}".
+
 The JSON object must have this exact structure:
 {
   "restaurant": "Name of the restaurant (or empty string if not found)",
-  "date": "Date of the receipt in YYYY-MM-DD format (or today's date if not found)",
+  "date": "Date of the receipt in YYYY-MM-DD format",
   "time": "Time of the receipt in HH:mm 24-hour format (e.g. 14:30) (or empty string if not found)",
   "amount": Total amount paid as a number (e.g. 450),
   "items": [
