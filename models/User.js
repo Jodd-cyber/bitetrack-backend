@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema(
       gender: { type: String, enum: ['male', 'female', 'other', ''], default: '' },
       goal: { type: String, enum: ['lose', 'maintain', 'gain', ''], default: '' },
       avatar: { type: String, default: '🍕' },
+      upiId: { type: String, default: "" },
       aiAssistant: {
         name: { type: String, default: "AI Assistant" },
         personality: { type: String, enum: ['normal', 'drill', 'coach', 'chef', ''], default: 'normal' },
