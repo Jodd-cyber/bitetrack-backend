@@ -34,6 +34,13 @@ router.post("/", protect, async (req, res) => {
       return res.status(400).json({ message: "Group name is required" });
     }
 
+    const user = await User.findById(req.user.id);
+    if (!user || !user.profile || !user.profile.upiId || !user.profile.upiId.trim()) {
+      return res.status(400).json({
+        message: "UPI ID Setup Required: To use Split Khata, you must first configure your UPI Payment ID in settings."
+      });
+    }
+
     const inviteCode = await getUniqueInviteCode();
     const group = await Group.create({
       name: name.trim(),
@@ -55,6 +62,13 @@ router.post("/join", protect, async (req, res) => {
     const { inviteCode } = req.body;
     if (!inviteCode) {
       return res.status(400).json({ message: "Invite code is required" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user || !user.profile || !user.profile.upiId || !user.profile.upiId.trim()) {
+      return res.status(400).json({
+        message: "UPI ID Setup Required: To use Split Khata, you must first configure your UPI Payment ID in settings."
+      });
     }
 
     const cleanCode = inviteCode.trim().toUpperCase();
