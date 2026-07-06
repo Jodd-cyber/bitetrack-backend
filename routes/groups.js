@@ -179,7 +179,7 @@ async function calculateGroupBalances(groupId, members) {
 // 3. LIST GROUPS CURRENT USER IS IN (Including individual net balances)
 router.get("/", protect, async (req, res) => {
   try {
-    const groups = await Group.find({ members: req.user.id }).populate("members", "name email");
+    const groups = await Group.find({ members: req.user.id }).populate("members", "name email profile");
     
     const formattedGroups = await Promise.all(
       groups.map(async (group) => {
@@ -207,7 +207,7 @@ router.get("/", protect, async (req, res) => {
 // 4. GET GROUP DETAILS (Logs, Members, Net Balances, Debts)
 router.get("/:id", protect, async (req, res) => {
   try {
-    const group = await Group.findById(req.params.id).populate("members", "name email");
+    const group = await Group.findById(req.params.id).populate("members", "name email profile");
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
     }
