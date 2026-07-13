@@ -227,7 +227,12 @@ ${emailText.substring(0, 5000)}
     console.error("Email sync error:", err);
     
     // Handle expired or revoked Google tokens
-    if (err.message && err.message.includes('invalid_grant')) {
+    const isInvalidGrant = 
+      (err.message && err.message.includes('invalid_grant')) ||
+      (err.response && err.response.data && err.response.data.error === 'invalid_grant') ||
+      (err.cause && err.cause.message === 'invalid_grant');
+
+    if (isInvalidGrant) {
       try {
         await User.findByIdAndUpdate(req.user.id, {
           $unset: { gmailSyncTokens: 1, lastEmailSyncDate: 1 }

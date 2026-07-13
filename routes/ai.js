@@ -570,7 +570,12 @@ Please provide a helpful, friendly, and concise answer. (Do not invent historica
             const gmail = google.gmail({ version: 'v1', auth: client });
             let baseQuery = '(from:noreply@zomato.com OR from:swiggy@swiggy.in OR from:noreply@swiggy.in) (subject:"Order" OR subject:"Receipt" OR subject:"Summary")';
             if (specificDateQuery) {
-              baseQuery += ` after:${specificDateQuery.replace(/\//g, '/')} before:${new Date(new Date(specificDateQuery).getTime() + 86400000 * 2).toISOString().split('T')[0].replace(/-/g, '/')}`;
+              const parsedDate = new Date(specificDateQuery);
+              if (!isNaN(parsedDate.getTime())) {
+                baseQuery += ` after:${specificDateQuery.replace(/\//g, '/')} before:${new Date(parsedDate.getTime() + 86400000 * 2).toISOString().split('T')[0].replace(/-/g, '/')}`;
+              } else {
+                console.warn(`⚠️ [AI] Invalid date query: "${specificDateQuery}", searching without date filter.`);
+              }
             }
 
             const response = await gmail.users.messages.list({
