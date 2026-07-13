@@ -104,7 +104,7 @@ router.post('/sync-emails', auth, async (req, res) => {
     // And from addresses are specific
     const now = new Date();
     const afterDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/01`;
-    const query = `(from:noreply@zomato.com OR from:swiggy@swiggy.in OR from:noreply@swiggy.in) (subject:"Order" OR subject:"Receipt" OR subject:"Summary") after:${afterDate}`;
+    const query = `(from:noreply@zomato.com OR from:swiggy@swiggy.in OR from:noreply@swiggy.in) (subject:"Order" OR subject:"Receipt" OR subject:"Summary" OR subject:"Invoice" OR subject:"Bill") after:${afterDate}`;
     
     // Fetch last 50 messages that match
     const response = await gmail.users.messages.list({
