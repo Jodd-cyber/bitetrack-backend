@@ -289,7 +289,10 @@ ${emailText.substring(0, 5000)}
     await user.save();
 
     console.log(`📧 [Gmail Sync] Done: ${newOrdersCount} new, ${skippedCount} already processed, ${errorCount} errors`);
-    res.json({ success: true, newOrders: newOrdersCount, message: `Successfully synced ${newOrdersCount} new orders!` });
+    const msg = newOrdersCount > 0 
+      ? `Successfully synced ${newOrdersCount} new orders!` 
+      : "No new orders found. Your Gmail is already up to date!";
+    res.json({ success: true, newOrders: newOrdersCount, message: msg });
   } catch (err) {
     console.error("Email sync error:", err);
     
