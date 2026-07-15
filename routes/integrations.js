@@ -72,6 +72,17 @@ router.post('/google/disconnect', auth, async (req, res) => {
   }
 });
 
+// Helper: determine meal type from time string
+const getMealTypeFromTime = (timeStr) => {
+  if (!timeStr) return "Lunch";
+  const [h] = timeStr.split(":").map(Number);
+  if (h >= 6 && h < 11) return "Breakfast";
+  if (h >= 11 && h < 15) return "Lunch";
+  if (h >= 15 && h < 18) return "Snacks";
+  if (h >= 18 && h < 22) return "Dinner";
+  return "Late Night";
+};
+
 // Endpoint 4: Trigger Manual Sync
 router.post('/sync-emails', auth, async (req, res) => {
   try {
@@ -99,34 +110,60 @@ router.post('/sync-emails', auth, async (req, res) => {
 
     const gmail = google.gmail({ version: 'v1', auth: client });
 
-    // Determine query: Swiggy or Zomato receipts
-    // Usually subjects contain "Order summary" or "Your order"
-    // And from addresses are specific
+    // Search last 3 months of food delivery emails
     const now = new Date();
-    const afterDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/01`;
-    const query = `(from:noreply@zomato.com OR from:swiggy@swiggy.in OR from:noreply@swiggy.in) (subject:"Order" OR subject:"Receipt" OR subject:"Summary" OR subject:"Invoice" OR subject:"Bill") after:${afterDate}`;
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    const afterDate = `${threeMonthsAgo.getFullYear()}/${String(threeMonthsAgo.getMonth() + 1).padStart(2, '0')}/${String(threeMonthsAgo.getDate()).padStart(2, '0')}`;
     
-    // Fetch last 50 messages that match
+    // Broadened sender list and subject keywords to catch more order emails
+    const senders = [
+      'noreply@zomato.com',
+      'auto-confirm@zomato.com',
+      'no-reply@zomato.com',
+      'swiggy@swiggy.in',
+      'noreply@swiggy.in',
+      'info@swiggy.in',
+      'no-reply@swiggy.in',
+    ].map(s => `from:${s}`).join(' OR ');
+    
+    const subjects = [
+      'Order', 'Receipt', 'Summary', 'Invoice', 'Bill',
+      'delivered', 'confirmed', 'placed', 'Your order'
+    ].map(s => `subject:"${s}"`).join(' OR ');
+    
+    const query = `(${senders}) (${subjects}) after:${afterDate}`;
+    
+    console.log(`📧 [Gmail Sync] Query: ${query}`);
+    
+    // Fetch last 100 messages that match
     const response = await gmail.users.messages.list({
       userId: 'me',
       q: query,
-      maxResults: 50
+      maxResults: 100
     });
 
     const messages = response.data.messages || [];
+    console.log(`📧 [Gmail Sync] Found ${messages.length} matching emails`);
+    
     if (messages.length === 0) {
-      return res.json({ success: true, newOrders: 0, message: "No new food orders found in Gmail." });
+      return res.json({ success: true, newOrders: 0, message: "No food order emails found in Gmail." });
     }
 
-    // Process only emails we haven't seen before, or just process the newest one for now
+    // Track already-processed email IDs to avoid re-processing
+    const processedEmailIds = user.processedEmailIds || [];
     let newOrdersCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
     
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     for (let msg of messages) {
-      // Check if we already processed this email ID (you could add an 'emailId' array to User schema to track this, 
-      // but for testing we will just parse it and check if an order exists with similar date/amount)
+      // Skip emails we've already processed
+      if (processedEmailIds.includes(msg.id)) {
+        skippedCount++;
+        continue;
+      }
       
       const msgData = await gmail.users.messages.get({
         userId: 'me',
@@ -162,7 +199,11 @@ router.post('/sync-emails', auth, async (req, res) => {
         emailText = decoded.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
       }
 
-      if (!emailText.trim()) continue;
+      if (!emailText.trim()) {
+        // Mark as processed even if empty so we don't retry
+        processedEmailIds.push(msg.id);
+        continue;
+      }
 
       const emailTimestamp = parseInt(msgData.data.internalDate);
       const emailDateObj = new Date(emailTimestamp);
@@ -182,7 +223,7 @@ Structure:
 }
 CRITICAL: You MUST extract EVERY SINGLE food item listed in the receipt. Do not summarize or omit any items. For each item, extract its exact quantity from the receipt (default to 1 if not found).
 IMPORTANT: This email was received on ${emailDateStr} at ${emailTimeStr}. If the exact order time is not explicitly found in the text, use ${emailTimeStr} as the time and ${emailDateStr} as the date.
-If this email is NOT a valid food order receipt, return { "invalid": true }.
+If this email is NOT a valid food order receipt (e.g. marketing, promotions, support, status updates without order details), return { "invalid": true }.
 
 Email Text:
 ${emailText.substring(0, 5000)}
@@ -193,35 +234,61 @@ ${emailText.substring(0, 5000)}
         const jsonStr = result.response.text().replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
         
         const parsed = JSON.parse(jsonStr);
-        if (parsed.invalid || !parsed.restaurant || !parsed.amount) continue;
+        if (parsed.invalid || !parsed.restaurant || !parsed.amount) {
+          processedEmailIds.push(msg.id);
+          continue;
+        }
 
-        // Check for duplicate in DB
+        // Check for duplicate: same user, same restaurant, same amount, AND same date
+        const orderDate = parsed.date ? new Date(parsed.date) : emailDateObj;
+        const dayStart = new Date(orderDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(orderDate);
+        dayEnd.setHours(23, 59, 59, 999);
+
         const existing = await FoodLog.findOne({
           user: req.user.id,
           amount: parsed.amount,
-          restaurant: new RegExp(parsed.restaurant, 'i')
+          restaurant: new RegExp('^' + parsed.restaurant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i'),
+          date: { $gte: dayStart, $lte: dayEnd }
         });
 
         // If not a duplicate, save it!
         if (!existing) {
+          const mealType = getMealTypeFromTime(parsed.time || emailTimeStr);
           const newLog = new FoodLog({
             user: req.user.id,
-            date: parsed.date ? new Date(parsed.date) : new Date(),
-            time: parsed.time || "12:00",
-            mealType: "Dinner", // Default fallback
+            date: parsed.date ? new Date(parsed.date) : emailDateObj,
+            time: parsed.time || emailTimeStr || "12:00",
+            mealType: mealType,
             restaurant: parsed.restaurant,
             amount: parsed.amount,
-            items: parsed.items || [],
-            notes: "Automatically synced from Gmail."
+            items: (parsed.items || []).map(item => ({ name: item.name, quantity: item.quantity || 1 })),
+            notes: "Automatically synced from Gmail.",
+            gmailMessageId: msg.id
           });
           await newLog.save();
           newOrdersCount++;
+          console.log(`✅ [Gmail Sync] New order: ${parsed.restaurant} - ₹${parsed.amount} on ${parsed.date}`);
+        } else {
+          console.log(`⏩ [Gmail Sync] Duplicate skipped: ${parsed.restaurant} - ₹${parsed.amount} on ${parsed.date}`);
         }
+        
+        processedEmailIds.push(msg.id);
       } catch (aiErr) {
+        errorCount++;
         console.error("Failed to process email with AI:", aiErr.message);
+        // Still mark as processed to avoid retrying broken emails
+        processedEmailIds.push(msg.id);
       }
     }
 
+    // Save processed email IDs back to user (keep only last 500 to prevent unbounded growth)
+    user.processedEmailIds = processedEmailIds.slice(-500);
+    user.lastEmailSyncDate = new Date();
+    await user.save();
+
+    console.log(`📧 [Gmail Sync] Done: ${newOrdersCount} new, ${skippedCount} already processed, ${errorCount} errors`);
     res.json({ success: true, newOrders: newOrdersCount, message: `Successfully synced ${newOrdersCount} new orders!` });
   } catch (err) {
     console.error("Email sync error:", err);

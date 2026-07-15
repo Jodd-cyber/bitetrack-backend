@@ -84,6 +84,7 @@ const userSchema = new mongoose.Schema(
       expiry_date: Number
     },
     lastEmailSyncDate: Date,
+    processedEmailIds: { type: [String], default: [] },
     pushToken: { type: String, default: "" }
   },
   { timestamps: true }
