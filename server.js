@@ -27,7 +27,7 @@ app.use(passport.initialize());
 
 // Routes
 app.get("/", (req, res) => {
-  res.json({ message: "BiteTrack API is running 🚀" });
+  res.json({ message: "BiteTrack API is running 🚀 (Redeploy Test)" });
 });
 
 app.get("/health", (req, res) => {
