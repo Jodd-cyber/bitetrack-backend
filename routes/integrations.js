@@ -110,10 +110,9 @@ router.post('/sync-emails', auth, async (req, res) => {
 
     const gmail = google.gmail({ version: 'v1', auth: client });
 
-    // Search last 3 months of food delivery emails
+    // Search from the 1st day of the current month
     const now = new Date();
-    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-    const afterDate = `${threeMonthsAgo.getFullYear()}/${String(threeMonthsAgo.getMonth() + 1).padStart(2, '0')}/${String(threeMonthsAgo.getDate()).padStart(2, '0')}`;
+    const afterDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/01`;
     
     // Broadened sender list and subject keywords to catch more order emails
     const senders = [
