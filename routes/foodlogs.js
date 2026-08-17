@@ -110,6 +110,12 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: "Log not found" });
     }
 
+    if (log.gmailMessageId) {
+      await User.findByIdAndUpdate(req.user.id, {
+        $pull: { processedEmailIds: log.gmailMessageId }
+      });
+    }
+
     res.json({ message: "Deleted successfully" });
 
   } catch (err) {

@@ -110,9 +110,15 @@ router.post('/sync-emails', auth, async (req, res) => {
 
     const gmail = google.gmail({ version: 'v1', auth: client });
 
-    // Search from the 1st day of the current month
-    const now = new Date();
-    const afterDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/01`;
+    // Search from provided fromDate or fallback to 90 days ago
+    let afterDate;
+    if (req.body && req.body.fromDate) {
+      afterDate = req.body.fromDate.replace(/-/g, '/');
+    } else {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 90);
+      afterDate = `${pastDate.getFullYear()}/${String(pastDate.getMonth() + 1).padStart(2, '0')}/${String(pastDate.getDate()).padStart(2, '0')}`;
+    }
     
     // Broadened sender list and subject keywords to catch more order emails
     const senders = [
@@ -148,8 +154,16 @@ router.post('/sync-emails', auth, async (req, res) => {
       return res.json({ success: true, newOrders: 0, message: "No food order emails found in Gmail." });
     }
 
-    // Track already-processed email IDs to avoid re-processing
-    const processedEmailIds = user.processedEmailIds || [];
+    // Track already-processed email IDs to avoid re-processing existing orders.
+    // If resetProcessed/forceResync is requested or order was deleted in past, clean up processedEmailIds!
+    const existingGmailLogs = await FoodLog.find({
+      user: req.user.id,
+      gmailMessageId: { $exists: true }
+    }).select('gmailMessageId');
+    const existingMessageIds = new Set(existingGmailLogs.map(l => l.gmailMessageId).filter(Boolean));
+
+    let rawProcessed = (req.body && (req.body.resetProcessed || req.body.forceResync)) ? [] : (user.processedEmailIds || []);
+    let processedEmailIds = rawProcessed.filter(id => existingMessageIds.has(id));
     let newOrdersCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
@@ -158,7 +172,7 @@ router.post('/sync-emails', auth, async (req, res) => {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     for (let msg of messages) {
-      // Skip emails we've already processed
+      // Skip emails we've already processed (whose food log currently exists)
       if (processedEmailIds.includes(msg.id)) {
         skippedCount++;
         continue;
