@@ -106,18 +106,34 @@ async function calculateGroupBalances(groupId, members) {
   });
 
   // Find all split logs
-  const logs = await FoodLog.find({ "splitInfo.groupId": groupId, "splitInfo.isSplit": true });
+  const logs = await FoodLog.find({
+    $or: [
+      { groupId: groupId },
+      { "splitInfo.groupId": groupId }
+    ]
+  });
   logs.forEach(log => {
-    const payer = log.splitInfo.paidBy?.toString();
+    const payer = log.splitInfo?.paidBy?.toString() || log.user?.toString();
     if (!payer) return;
 
-    log.splitInfo.shares.forEach(share => {
-      const debtor = share.user?.toString();
-      const amount = share.amount || 0;
-      if (debtor && payer && debtor !== payer && debts[debtor] && debts[debtor][payer] !== undefined) {
-        debts[debtor][payer] += amount;
-      }
-    });
+    if (Array.isArray(log.splitInfo?.shares) && log.splitInfo.shares.length > 0) {
+      log.splitInfo.shares.forEach(share => {
+        const debtor = share.user?.toString();
+        const amount = share.amount || 0;
+        if (debtor && payer && debtor !== payer && debts[debtor] && debts[debtor][payer] !== undefined) {
+          debts[debtor][payer] += amount;
+        }
+      });
+    } else if (members && members.length > 0) {
+      const totalAmount = Number(log.amount || 0);
+      const equalShare = totalAmount / members.length;
+      members.forEach(m => {
+        const debtor = m._id.toString();
+        if (debtor !== payer && debts[debtor] && debts[debtor][payer] !== undefined) {
+          debts[debtor][payer] += equalShare;
+        }
+      });
+    }
   });
 
   // Find all completed settlements
@@ -231,7 +247,12 @@ router.get("/:id", protect, async (req, res) => {
     }
 
     // Fetch food logs and settlements
-    const logs = await FoodLog.find({ "splitInfo.groupId": group._id })
+    const logs = await FoodLog.find({
+      $or: [
+        { groupId: group._id },
+        { "splitInfo.groupId": group._id }
+      ]
+    })
       .populate("user", "name")
       .populate("splitInfo.paidBy", "name")
       .populate("splitInfo.shares.user", "name")
@@ -296,6 +317,32 @@ router.post("/:id/settlements", protect, async (req, res) => {
       amount: Number(amount),
       status: 'pending', // Set status to pending initially
     });
+
+    // Send push notification to the recipient (non-blocking)
+    try {
+      const [fromUserDoc, toUserDoc, groupDoc] = await Promise.all([
+        User.findById(req.user.id, 'name'),
+        User.findById(toUser, 'name pushToken'),
+        Group.findById(groupId, 'name'),
+      ]);
+      if (toUserDoc && toUserDoc.pushToken && toUserDoc.pushToken.trim()) {
+        const fromName = fromUserDoc ? fromUserDoc.name : 'Someone';
+        const groupName = groupDoc ? groupDoc.name.replace(/\[cat:.*?\]/, '').trim() : 'your group';
+        fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            to: toUserDoc.pushToken,
+            title: `💰 ${fromName} settled up`,
+            body: `₹${Number(amount)} payment sent in ${groupName}. Tap to accept.`,
+            sound: 'default',
+            data: { type: 'SETTLEMENT_CREATED', groupId: groupId.toString() },
+          }),
+        }).catch(() => {});
+      }
+    } catch (pushErr) {
+      console.log('Settlement push error (non-fatal):', pushErr.message);
+    }
 
     res.status(201).json({ success: true, data: settlement });
   } catch (err) {
@@ -414,6 +461,32 @@ router.post("/:groupId/settlements/:settlementId/accept", protect, async (req, r
 
     settlement.status = "completed";
     await settlement.save();
+
+    // Notify the sender that their settlement was accepted (non-blocking)
+    try {
+      const [acceptorDoc, senderDoc, groupDoc] = await Promise.all([
+        User.findById(req.user.id, 'name'),
+        User.findById(settlement.fromUser, 'name pushToken'),
+        Group.findById(groupId, 'name'),
+      ]);
+      if (senderDoc && senderDoc.pushToken && senderDoc.pushToken.trim()) {
+        const acceptorName = acceptorDoc ? acceptorDoc.name : 'Someone';
+        const groupName = groupDoc ? groupDoc.name.replace(/\[cat:.*?\]/, '').trim() : 'your group';
+        fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            to: senderDoc.pushToken,
+            title: `✅ ${acceptorName} accepted your payment`,
+            body: `₹${settlement.amount} settlement confirmed in ${groupName}`,
+            sound: 'default',
+            data: { type: 'SETTLEMENT_CREATED', groupId: groupId.toString() },
+          }),
+        }).catch(() => {});
+      }
+    } catch (pushErr) {
+      console.log('Settlement accept push error (non-fatal):', pushErr.message);
+    }
 
     res.json({ success: true, message: "Settlement transaction marked as completed", data: settlement });
   } catch (err) {
